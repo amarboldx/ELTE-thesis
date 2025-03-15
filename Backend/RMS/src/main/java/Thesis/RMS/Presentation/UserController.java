@@ -25,9 +25,7 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private final UserService userService;
-    private final UserDetailsService userDetailsService;
     private final AuthenticationManager authenticationManager;
-    private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
     @PostMapping("/register")
