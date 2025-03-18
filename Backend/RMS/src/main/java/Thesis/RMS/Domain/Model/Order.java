@@ -1,6 +1,7 @@
 package Thesis.RMS.Domain.Model;
 
 import Thesis.RMS.Domain.Enums.OrderStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class Order {
     @ManyToOne
     @JoinColumn(name = "staff_id", nullable = false)
     private Staff staff;
+
 
     @ManyToMany
     @JoinTable(

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,21 +19,25 @@ import java.util.List;
 public class OrderController {
     private final OrderUseCases orderUseCases;
 
+    @Transactional
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getAllOrders() {
         return ResponseEntity.ok(orderUseCases.getOrders());
     }
 
+    @Transactional
     @GetMapping("/{id}")
     public ResponseEntity<OrderDTO> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderUseCases.getOrderById(id));
     }
 
+    @Transactional
     @GetMapping("/table/{tableNumber}")
     public ResponseEntity<List<OrderDTO>> getOrdersByTableNumber(@PathVariable int tableNumber) {
         return ResponseEntity.ok(orderUseCases.getOrderByTableNumber(tableNumber));
     }
 
+    @Transactional
     @GetMapping("/status/{status}")
     public ResponseEntity<List<OrderDTO>> getOrdersByStatus(@PathVariable OrderStatus status) {
         return ResponseEntity.ok(orderUseCases.getOrdersByStatus(status));

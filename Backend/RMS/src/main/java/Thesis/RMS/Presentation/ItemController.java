@@ -1,6 +1,7 @@
 package Thesis.RMS.Presentation;
 
 
+import Thesis.RMS.Application.DTO.ItemDTO;
 import Thesis.RMS.Application.DTO.Request.CreateItemRequest;
 import Thesis.RMS.Application.UseCases.ItemUseCases;
 import Thesis.RMS.Domain.Enums.Allergen_List;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +21,7 @@ import java.util.List;
 public class ItemController {
 
     private final ItemUseCases itemUseCases;
-
+    
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<Item> createItem(@RequestBody CreateItemRequest createItemRequest) {
@@ -32,19 +34,27 @@ public class ItemController {
         return ResponseEntity.ok(newItem);
     }
 
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Item> getItemById(@PathVariable Long id) {
+    @Transactional
+    @GetMapping("/get/{id}")
+    public ResponseEntity<ItemDTO> getItemById(@PathVariable Long id) {
         return ResponseEntity.ok(itemUseCases.getItemById(id));
     }
-
-    @GetMapping
-    public ResponseEntity<List<Item>> getAllItems() {
+    
+    @Transactional
+    @GetMapping("/get")
+    public ResponseEntity<List<ItemDTO>> getAllItems() {
         return ResponseEntity.ok(itemUseCases.getItems());
     }
 
-    @GetMapping("/available")
-    public ResponseEntity<List<Item>> getAvailableItems() {
+    @Transactional
+    @PostMapping("/list-id")
+    public ResponseEntity<List<ItemDTO>> getItemsById(@RequestBody List<Long> ids) {
+        return ResponseEntity.ok(itemUseCases.getItemsByListofIds(ids));
+    }
+
+    @Transactional
+    @GetMapping("/get/available")
+    public ResponseEntity<List<ItemDTO>> getAvailableItems() {
         return ResponseEntity.ok(itemUseCases.getAvailableItems());
     }
 
@@ -79,13 +89,13 @@ public class ItemController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/by-name")
-    public ResponseEntity<Item> getItemByName(@RequestParam String name) {
+    @GetMapping("/get/by-name")
+    public ResponseEntity<ItemDTO> getItemByName(@RequestParam String name) {
         return ResponseEntity.ok(itemUseCases.getByName(name));
     }
 
-    @GetMapping("/by-allergens")
-    public ResponseEntity<List<Item>> getItemsByAllergen(@RequestParam List<Allergen_List> allergens) {
+    @GetMapping("/get/by-allergens")
+    public ResponseEntity<List<ItemDTO>> getItemsByAllergen(@RequestParam List<Allergen_List> allergens) {
         return ResponseEntity.ok(itemUseCases.getItemsByAllergen(allergens));
     }
 }

@@ -34,17 +34,14 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .exceptionHandling(exception -> exception
+                    .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authEntryPointJwt))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/users/register").permitAll()
                         .requestMatchers("/api/v1/users/login").permitAll()
-                        .requestMatchers("/api/v1/menu").permitAll()
-                        .requestMatchers("/api/v1/menu/available").permitAll()
-                        .requestMatchers("/api/v1/menu/by-name").permitAll()
-                        .requestMatchers("/api/v1/menu/by-allergens").permitAll()
+                        .requestMatchers("/api/v1/menu/get").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
 

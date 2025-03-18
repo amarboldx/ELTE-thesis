@@ -1,13 +1,17 @@
 package Thesis.RMS.Application.UseCases;
 
+import Thesis.RMS.Application.DTO.ItemDTO;
 import Thesis.RMS.Domain.Enums.Allergen_List;
 import Thesis.RMS.Domain.Model.Item;
 import Thesis.RMS.Domain.Repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor(onConstructor = @__(@Autowired))
@@ -40,16 +44,24 @@ public class ItemUseCases {
         return itemRepository.save(item);
     }
 
-    public List<Item> getItems() {
-        return itemRepository.findAll();
+    @Transactional
+    public List<ItemDTO> getItems() {
+        return itemRepository.findAll().stream()
+                .map(ItemDTO::new)
+                .collect(Collectors.toList());
     }
 
-    public List<Item> getAvailableItems() {
-        return itemRepository.findByAvailable(true);
+    public List<ItemDTO> getAvailableItems() {
+        return itemRepository.findByAvailable(true).stream()
+                .map(ItemDTO::new)
+                .collect(Collectors.toList());
     }
 
-    public List<Item> getItemsByAllergen(List<Allergen_List> allergenList) {
-        return itemRepository.findByAllergenLists(allergenList);
+    @Transactional
+    public List<ItemDTO> getItemsByAllergen(List<Allergen_List> allergenList) {
+        return itemRepository.findByAllergenLists(allergenList).stream()
+                .map(ItemDTO::new)
+                .collect(Collectors.toList());
     }
 
     public void updateItemAvailability(Long itemId, boolean available) {
@@ -66,11 +78,30 @@ public class ItemUseCases {
         itemRepository.save(item);
     }
 
-    public Item getItemById(Long itemId) {
-        return itemRepository.findById(itemId).orElseThrow(() -> new IllegalArgumentException("Item with ID " + itemId + " not found."));
+    @Transactional
+    public ItemDTO getItemById(Long itemId) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Item with ID " + itemId + " not found."));
+        return new ItemDTO(item);
+    }
+    @Transactional
+    public ItemDTO getByName(String name) {
+        Item item = itemRepository.findByName(name)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Item with name " + name + " not found."));
+        return new ItemDTO(item);
     }
 
-    public Item getByName(String name) {
-        return itemRepository.findByName(name).getFirst();
+    @Transactional
+    public List<ItemDTO> getItemsByListofIds(List<Long> itemIds) {
+        List<ItemDTO> items = new ArrayList<>();
+
+        for (Long itemId : itemIds) {
+            itemRepository.findById(itemId).ifPresent(item -> items.add(new ItemDTO(item)));
+        }
+
+        return items;
     }
+
 }
