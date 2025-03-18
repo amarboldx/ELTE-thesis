@@ -16,6 +16,6 @@ public class OrderDTO {
     private Long tableDataId;
     private LocalDateTime date;
     private OrderStatus status;
-    private String waiterId;
+    private Long staffId;
     private List<Long> itemIds;
 }

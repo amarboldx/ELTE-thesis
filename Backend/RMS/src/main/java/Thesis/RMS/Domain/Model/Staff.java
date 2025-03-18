@@ -19,6 +19,7 @@ public class Staff {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
 

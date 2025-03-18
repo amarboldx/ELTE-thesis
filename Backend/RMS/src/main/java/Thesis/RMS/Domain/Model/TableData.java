@@ -7,6 +7,7 @@ import Thesis.RMS.Domain.Enums.TableStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -32,10 +33,10 @@ public class TableData {
         private TableStatus tableStatus;
 
         @OneToMany(mappedBy = "tableData", cascade = CascadeType.ALL, orphanRemoval = true)
-        private List<Order> orders;
+        private List<Order> orders = new ArrayList<>();
 
         @OneToMany(mappedBy = "tableData", cascade = CascadeType.ALL, orphanRemoval = true)
-        private List<Reservation> reservations;
+        private List<Reservation> reservations = new ArrayList<>();
 
         @ManyToOne
         @JoinColumn(name = "staff_id", nullable = true)

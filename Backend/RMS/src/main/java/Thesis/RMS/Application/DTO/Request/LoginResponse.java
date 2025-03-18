@@ -1,4 +1,4 @@
-package Thesis.RMS.Application.DTO;
+package Thesis.RMS.Application.DTO.Request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
@@ -26,12 +27,18 @@ public class StaffUseCases {
     private final StaffRepository staffRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     public StaffResponseDTO createStaff(StaffDTO staffDTO) {
         UserDetails currentUserDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String username = currentUserDetails.getUsername();
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found"));
+
+        Optional<Staff> existingStaff = staffRepository.findByUser(user);
+        if (existingStaff.isPresent()) {
+            return toStaffResponseDTO(existingStaff.get());
+        }
 
         Staff staff = new Staff();
         staff.setName(staffDTO.getName());
@@ -51,6 +58,7 @@ public class StaffUseCases {
 
         return toStaffResponseDTO(staff);
     }
+
 
     public Optional<StaffResponseDTO> getStaffById(Long id) {
         Optional<Staff> staff = staffRepository.findById(id);

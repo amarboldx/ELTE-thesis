@@ -10,6 +10,7 @@ import Thesis.RMS.Domain.Model.TableData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor(onConstructor = @__(@Autowired))
 public class TableDataController {
     private final TableDataUseCases tableDataUseCases;
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<TableDataDTO> createTable(@RequestBody TableDataDTO tableDataDTO) {
         TableData tableData = new TableData();
@@ -81,13 +82,13 @@ public class TableDataController {
         List<TableDataDTO> tables = tableDataUseCases.getTablesByFloor(floor);
         return ResponseEntity.ok(tables);
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PutMapping("/{tableId}/status")
     public ResponseEntity<String> updateTableStatus(@PathVariable Long tableId) {
         tableDataUseCases.updateTableStatus(tableId);
         return ResponseEntity.ok("Table status updated successfully.");
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{tableId}")
     public ResponseEntity<String> deleteTable(@PathVariable Long tableId) {
         tableDataUseCases.deleteTableById(tableId);

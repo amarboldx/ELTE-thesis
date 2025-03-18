@@ -10,6 +10,7 @@ import Thesis.RMS.Domain.Repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +24,7 @@ public class ShiftUseCases {
     private final ShiftRepository shiftRepository;
     private final StaffRepository staffRepository;
 
+    @Transactional
     public ShiftResponseDTO createShift(ShiftDTO shiftDTO) {
         Optional<Staff> staffOptional = staffRepository.findById(shiftDTO.getStaffId());
         if (staffOptional.isEmpty()) {

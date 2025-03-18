@@ -7,6 +7,7 @@ import Thesis.RMS.Domain.Enums.OrderStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,36 +37,36 @@ public class OrderController {
     public ResponseEntity<List<OrderDTO>> getOrdersByStatus(@PathVariable OrderStatus status) {
         return ResponseEntity.ok(orderUseCases.getOrdersByStatus(status));
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PostMapping
     public ResponseEntity<OrderDTO> createOrder(@RequestBody OrderDTO orderDTO) {
         return ResponseEntity.ok(orderUseCases.createOrder(orderDTO));
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         orderUseCases.deleteOrder(id);
         return ResponseEntity.noContent().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateOrderStatus(@PathVariable Long id, @RequestParam OrderStatus status) {
         orderUseCases.updateOrderStatus(id, status);
         return ResponseEntity.ok().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PatchMapping("/{id}/add-item")
     public ResponseEntity<Void> addItemToOrder(@PathVariable Long id, @RequestParam Long itemId) {
         orderUseCases.addItemToList(id, itemId);
         return ResponseEntity.ok().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/remove-item")
     public ResponseEntity<Void> removeItemFromOrder(@PathVariable Long id, @RequestParam Long itemId) {
         orderUseCases.removeItemFromOrder(id, itemId);
         return ResponseEntity.ok().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelOrder(@PathVariable Long id) {
         orderUseCases.cancelOrder(id);

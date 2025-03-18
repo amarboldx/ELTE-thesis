@@ -1,6 +1,6 @@
 package Thesis.RMS.Application.UseCases;
 
-import Thesis.RMS.Application.DTO.ChangePasswordRequest;
+import Thesis.RMS.Application.DTO.Request.ChangePasswordRequest;
 import Thesis.RMS.Application.DTO.UserDTO;
 import Thesis.RMS.Domain.Model.User;
 import Thesis.RMS.Domain.Repository.UserRepository;
@@ -9,7 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +27,9 @@ public class UserService {
         User newUser = new User();
         newUser.setUsername(userDTO.getUsername());
         newUser.setPassword(passwordEncoder.encode(userDTO.getPassword()));
-        newUser.setRoles(Collections.singleton("USER")); // Default role
+
+        Set<String> roles = new HashSet<>(userDTO.getRoles());
+        newUser.setRoles(roles);
 
         userRepository.save(newUser);
         return ResponseEntity.ok("User registered successfully.");

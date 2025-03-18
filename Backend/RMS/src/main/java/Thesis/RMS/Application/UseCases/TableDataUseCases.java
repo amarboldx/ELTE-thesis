@@ -10,6 +10,7 @@ import Thesis.RMS.Domain.Repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -83,8 +84,9 @@ public class TableDataUseCases {
         return (dx * dx + dy * dy) < (radius * radius);
     }
 
-
+    @Transactional
     public TableDataDTO createTable(TableData tableData) {
+        validateNoOverlap(tableData);
         TableData savedTableData = tableDataRepository.save(tableData);
         return toTableDataDTO(savedTableData);
     }

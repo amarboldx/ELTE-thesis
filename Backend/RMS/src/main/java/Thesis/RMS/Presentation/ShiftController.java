@@ -7,7 +7,9 @@ import Thesis.RMS.Application.UseCases.ShiftUseCases;
 import Thesis.RMS.Domain.Enums.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -19,7 +21,7 @@ import java.util.Optional;
 @RequiredArgsConstructor(onConstructor_ = @__(@Autowired))
 public class ShiftController {
     private final ShiftUseCases shiftUseCases;
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<ShiftResponseDTO> createShift(@RequestBody ShiftDTO shiftDTO) {
         return ResponseEntity.ok(shiftUseCases.createShift(shiftDTO));
@@ -42,8 +44,8 @@ public class ShiftController {
 
     @GetMapping("/time-range")
     public ResponseEntity<List<ShiftResponseDTO>> getShiftsByTimeRange(
-            @RequestParam LocalDateTime start,
-            @RequestParam LocalDateTime end) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         return ResponseEntity.ok(shiftUseCases.getShiftsByTimeRange(start, end));
     }
 
@@ -54,7 +56,7 @@ public class ShiftController {
             @RequestParam Role role) {
         return ResponseEntity.ok(shiftUseCases.getShiftsByRoleAndTimeRange(start, end, role));
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{shiftId}")
     public ResponseEntity<Void> deleteShiftById(@PathVariable Long shiftId) {
         shiftUseCases.deleteShiftById(shiftId);

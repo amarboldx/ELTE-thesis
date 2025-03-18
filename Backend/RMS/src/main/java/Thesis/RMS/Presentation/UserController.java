@@ -1,6 +1,9 @@
 package Thesis.RMS.Presentation;
 
 import Thesis.RMS.Application.DTO.*;
+import Thesis.RMS.Application.DTO.Request.ChangePasswordRequest;
+import Thesis.RMS.Application.DTO.Request.LoginRequest;
+import Thesis.RMS.Application.DTO.Request.LoginResponse;
 import Thesis.RMS.Application.UseCases.UserService;
 import Thesis.RMS.Infrastructure.Security.JwtUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,8 +15,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

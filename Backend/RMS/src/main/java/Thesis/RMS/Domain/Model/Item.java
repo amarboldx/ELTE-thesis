@@ -4,6 +4,7 @@ import Thesis.RMS.Domain.Enums.Allergen_List;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -35,8 +36,6 @@ public class Item {
     @Column(nullable = false)
     private boolean available;
 
-    @ManyToOne
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
-
+    @ManyToMany(mappedBy = "items")
+    private List<Order> orders = new ArrayList<>();
 }

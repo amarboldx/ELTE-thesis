@@ -1,12 +1,14 @@
 package Thesis.RMS.Presentation;
 
 
+import Thesis.RMS.Application.DTO.Request.CreateItemRequest;
 import Thesis.RMS.Application.UseCases.ItemUseCases;
 import Thesis.RMS.Domain.Enums.Allergen_List;
 import Thesis.RMS.Domain.Model.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,15 +19,19 @@ import java.util.List;
 public class ItemController {
 
     private final ItemUseCases itemUseCases;
+
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
-    public ResponseEntity<Item> createItem(
-            @RequestParam String name,
-            @RequestParam String description,
-            @RequestParam double price,
-            @RequestParam List<Allergen_List> allergens) {
-        Item newItem = itemUseCases.createItem(name, description, price, allergens);
+    public ResponseEntity<Item> createItem(@RequestBody CreateItemRequest createItemRequest) {
+        Item newItem = itemUseCases.createItem(
+                createItemRequest.getName(),
+                createItemRequest.getDescription(),
+                createItemRequest.getPrice(),
+                createItemRequest.getAllergens()
+        );
         return ResponseEntity.ok(newItem);
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<Item> getItemById(@PathVariable Long id) {
@@ -42,31 +48,31 @@ public class ItemController {
         return ResponseEntity.ok(itemUseCases.getAvailableItems());
     }
 
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<Item> updateItem(
             @PathVariable Long id,
-            @RequestParam String name,
-            @RequestParam String description,
-            @RequestParam double price,
-            @RequestParam List<Allergen_List> allergens,
-            @RequestParam boolean available) {
+            @RequestBody String name,
+            @RequestBody String description,
+            @RequestBody double price,
+            @RequestBody List<Allergen_List> allergens,
+            @RequestBody boolean available) {
         Item updatedItem = itemUseCases.updateItem(id, name, description, price, allergens, available);
         return ResponseEntity.ok(updatedItem);
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteItem(@PathVariable Long id) {
         itemUseCases.deleteItem(id);
         return ResponseEntity.noContent().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/availability")
     public ResponseEntity<Void> updateItemAvailability(@PathVariable Long id, @RequestParam boolean available) {
         itemUseCases.updateItemAvailability(id, available);
         return ResponseEntity.ok().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/price")
     public ResponseEntity<Void> updateItemPrice(@PathVariable Long id, @RequestParam double price) {
         itemUseCases.updateItemPrice(id, price);

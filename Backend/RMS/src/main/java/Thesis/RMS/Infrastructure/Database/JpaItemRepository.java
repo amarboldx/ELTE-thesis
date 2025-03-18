@@ -36,4 +36,5 @@ public interface JpaItemRepository extends JpaRepository<Item, Long>, ItemReposi
 
     @Override
     List<Item> findByAvailable(boolean available);
+
 }

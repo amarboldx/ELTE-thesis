@@ -8,6 +8,7 @@ import Thesis.RMS.Domain.Enums.ReservationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.Optional;
 @RequiredArgsConstructor(onConstructor_ = @__(@Autowired))
 public class ReservationController {
     private final ReservationUseCases reservationUseCases;
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<ReservationResponseDTO> createReservation(@RequestBody ReservationDTO reservationDTO) {
         return ResponseEntity.ok(reservationUseCases.createReservation(reservationDTO));
@@ -45,13 +47,13 @@ public class ReservationController {
             @RequestParam LocalDateTime end) {
         return ResponseEntity.ok(reservationUseCases.findByStartTimeBetween(start, end));
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReservationById(@PathVariable Long id) {
         reservationUseCases.deleteReservationById(id);
         return ResponseEntity.noContent().build();
     }
-
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateReservationStatus(@PathVariable Long id, @RequestParam ReservationStatus status) {
         reservationUseCases.updateReservationStatus(id, status);

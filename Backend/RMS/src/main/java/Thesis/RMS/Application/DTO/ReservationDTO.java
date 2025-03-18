@@ -1,8 +1,10 @@
 package Thesis.RMS.Application.DTO;
 
 import Thesis.RMS.Domain.Enums.ReservationStatus;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ReservationDTO {
