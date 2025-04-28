@@ -23,12 +23,13 @@ const LoginScreen = ({ navigation }) => {
                 password,
             });
 
-            const { token, username: user, roles } = response.data;
+            const { token, username: user, roles, staffId  } = response.data;
 
             if (token) {
                 await AsyncStorage.setItem('jwtToken', token);
                 await AsyncStorage.setItem('username', user);
                 await AsyncStorage.setItem('roles', JSON.stringify(roles));
+                await AsyncStorage.setItem('staffId', String(staffId));
 
                 console.log('JWT Token:', token);
                 console.log('Username:', user);

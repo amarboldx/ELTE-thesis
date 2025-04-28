@@ -7,6 +7,8 @@ import { AuthContext } from './context/AuthContext';
 
 import LoginScreen from './LoginScreen';
 import HomeScreen from './HomeScreen';
+import AddOrderScreen from './AddOrderScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -43,7 +45,12 @@ const AppNavigator = () => {
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
+
+        <Stack.Screen name="AddOrder" component={AddOrderScreen} />
+      
       </Stack.Navigator>
+
+      
     </NavigationContainer>
   );
 };

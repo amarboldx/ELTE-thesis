@@ -36,6 +36,11 @@ const HomeScreen = () => {
     try {
       await AsyncStorage.clear();
       setIsLoggedIn(false);
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     } catch (error) {
       console.error('Error during logout:', error);
     }
