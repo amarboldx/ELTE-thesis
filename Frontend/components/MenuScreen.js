@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Button } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Button, TouchableOpacity } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './config/api';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
 
 const MenuScreen = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(null);
+  const [roles, setRoles] = useState([]); 
+
+  const navigation = useNavigation();
 
   useEffect(() => {
     checkToken();
@@ -17,10 +22,16 @@ const MenuScreen = () => {
   const checkToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('jwtToken');
+      const storedRoles = await AsyncStorage.getItem('roles'); 
       console.log('Stored Token:', storedToken);
+      console.log('Stored Roles:', storedRoles);
+
       setToken(storedToken);
-  
-      if (storedToken) {
+      if (storedRoles) {
+        setRoles(JSON.parse(storedRoles)); // Parse roles from JSON string to array
+      }
+
+      if (storedToken && storedRoles) {
         fetchMenuItems();
       } else {
         setError('No authentication token found. Please log in again.');
@@ -32,39 +43,19 @@ const MenuScreen = () => {
       setLoading(false);
     }
   };
-  
 
   const fetchMenuItems = async () => {
     try {
       setLoading(true);
-      
       const response = await api.get('/menu/get');
-  
       console.log('Menu response:', response.data);
       setMenuItems(response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching menu items:', err);
-      if (err.response) {
-        console.log('Error response:', err.response.status, err.response.data);
-        setError(`Failed to load menu items. Server returned ${err.response.status}`);
-      } else if (err.request) {
-        console.log('Error request:', err.request);
-        setError('No response received from server');
-      } else {
-        setError('An error occurred while fetching menu items');
-      }
+      setError('Failed to load menu items.');
     } finally {
       setLoading(false);
-    }
-  };
-  
-
-  const refreshMenu = () => {
-    if (token) {
-      fetchMenuItems(token);
-    } else {
-      checkToken();
     }
   };
 
@@ -81,6 +72,15 @@ const MenuScreen = () => {
     </Card>
   );
 
+  const handleAddItem = () => {
+    console.log('Attempting to navigate to AddMenu');
+    try {
+      navigation.navigate('AddMenu');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -91,29 +91,38 @@ const MenuScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Menu</Text>
-      
-      <View style={styles.debugContainer}>
-        <Text>Token status: {token ? 'Present' : 'Not found'}</Text>
-        <Button title="Refresh Menu" onPress={refreshMenu} />
-      </View>
-      
-      {error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+      <View style={styles.container}>
+        <Text style={styles.title}>Menu</Text>
+        
+        {/* FlatList inside a container */}
+        <View style={{ flex: 1 }}>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : menuItems.length === 0 ? (
+            <Text style={styles.emptyText}>No menu items available</Text>
+          ) : (
+            <FlatList
+              data={menuItems}
+              renderItem={renderItem}
+              keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+              contentContainerStyle={styles.listContainer}
+            />
+          )}
         </View>
-      ) : menuItems.length === 0 ? (
-        <Text style={styles.emptyText}>No menu items available</Text>
-      ) : (
-        <FlatList
-          data={menuItems}
-          renderItem={renderItem}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
-    </View>
+
+        {roles.includes('ADMIN') && (
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={handleAddItem}
+          >
+            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialCommunityIcons name="plus" size={24} color="white" />
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
   );
 };
 
@@ -129,11 +138,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  debugContainer: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    marginBottom: 10,
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    backgroundColor: '#6200ee',
+    borderRadius: 50,
+    padding: 16,
+    elevation: 10,
   },
   listContainer: {
     paddingBottom: 20,
