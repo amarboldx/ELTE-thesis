@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
 import { Button } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -217,7 +217,11 @@ const AddReservationScreen = ({ navigation }) => {
         )}
         contentContainerStyle={styles.tableList}
       />
-
+     
+     <KeyboardAvoidingView
+                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                 style={styles.searchContainer}
+               >
       <Text style={styles.header}>Customer Name</Text>
       <TextInput
         style={styles.input}
@@ -225,6 +229,7 @@ const AddReservationScreen = ({ navigation }) => {
         value={customerName}
         onChangeText={setCustomerName}
       />
+      </KeyboardAvoidingView>
 
       <Text style={styles.header}>Reservation Start Time</Text>
       <TouchableOpacity
