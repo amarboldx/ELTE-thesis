@@ -1,6 +1,7 @@
 package Thesis.RMS.Domain.Model;
 
 import Thesis.RMS.Domain.Enums.ReservationStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -23,9 +24,11 @@ public class Reservation {
     @Column(nullable = false)
     private String customerName;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     @Column(nullable = false)
     private LocalDateTime startTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     @Column(nullable = false)
     private LocalDateTime endTime;
 

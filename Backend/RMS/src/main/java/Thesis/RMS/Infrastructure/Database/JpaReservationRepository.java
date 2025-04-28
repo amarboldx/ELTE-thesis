@@ -1,6 +1,8 @@
 package Thesis.RMS.Infrastructure.Database;
 
+import Thesis.RMS.Domain.Enums.ReservationStatus;
 import Thesis.RMS.Domain.Model.Reservation;
+import Thesis.RMS.Domain.Model.TableData;
 import Thesis.RMS.Domain.Repository.ReservationRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -23,6 +25,11 @@ public interface JpaReservationRepository extends JpaRepository<Reservation, Lon
 
     @Override
     @NonNull
+    @Query("SELECT r FROM Reservation r WHERE r.status = ?1")
+    List<Reservation> findByStatus(ReservationStatus status);
+
+    @Override
+    @NonNull
     Optional<Reservation> findById(@NonNull Long id);
 
     @Override
@@ -35,5 +42,17 @@ public interface JpaReservationRepository extends JpaRepository<Reservation, Lon
 
     @Override
     void deleteById(@NonNull Long id);
+
+    @Override
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END " +
+            "FROM Reservation r " +
+            "WHERE r.tableData = :tableData " +
+            "AND r.status <> 'CANCELLED' " +
+            "AND ((r.startTime < :endTime AND r.endTime > :startTime))")
+    boolean existsByTableDataAndTimeRange(
+            TableData tableData,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    );
 
 }

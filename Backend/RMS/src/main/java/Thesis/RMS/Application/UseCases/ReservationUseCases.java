@@ -24,27 +24,49 @@ public class ReservationUseCases {
     private final TableRepository tableDataRepository;
 
     public ReservationResponseDTO createReservation(ReservationDTO reservationDTO) {
+        // 1. Check if table exists
         Optional<TableData> tableDataOptional = tableDataRepository.findById(reservationDTO.getTableId());
         if (tableDataOptional.isEmpty()) {
-            throw new IllegalArgumentException("Table with ID " + reservationDTO.getTableId() + " not found.");
+            throw new IllegalArgumentException("Table not found");
         }
-        TableData tableData = tableDataOptional.get();
 
+        // 2. Validate time range
+        if (reservationDTO.getEndTime().isBefore(reservationDTO.getStartTime())) {
+            throw new IllegalArgumentException("End time must be after start time");
+        }
+
+        // 3. Check for conflicts (assuming UTC timezone)
+        boolean hasConflict = reservationRepository.existsByTableDataAndTimeRange(
+                tableDataOptional.get(),
+                reservationDTO.getStartTime(),
+                reservationDTO.getEndTime()
+        );
+
+        if (hasConflict) {
+            throw new IllegalStateException("Time conflict with existing reservation");
+        }
+
+        // 4. Create reservation
         Reservation reservation = new Reservation();
-        reservation.setTableData(tableData);
+        reservation.setTableData(tableDataOptional.get());
         reservation.setCustomerName(reservationDTO.getCustomerName());
         reservation.setStartTime(reservationDTO.getStartTime());
         reservation.setEndTime(reservationDTO.getEndTime());
         reservation.setStatus(reservationDTO.getStatus());
 
         reservation = reservationRepository.save(reservation);
-
         return toReservationResponseDTO(reservation);
     }
 
     public List<ReservationResponseDTO> getAllReservations() {
         List<Reservation> reservations = reservationRepository.findAll();
         return reservations.stream()
+                .map(this::toReservationResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ReservationResponseDTO> getReservationsByStatus(ReservationStatus status) {
+        return reservationRepository.findByStatus(status).stream()
                 .map(this::toReservationResponseDTO)
                 .collect(Collectors.toList());
     }

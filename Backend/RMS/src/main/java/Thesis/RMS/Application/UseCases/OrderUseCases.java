@@ -2,6 +2,7 @@ package Thesis.RMS.Application.UseCases;
 
 import Thesis.RMS.Application.DTO.OrderDTO;
 import Thesis.RMS.Domain.Enums.OrderStatus;
+import Thesis.RMS.Domain.Enums.TableStatus;
 import Thesis.RMS.Domain.Model.*;
 import Thesis.RMS.Domain.Repository.*;
 import lombok.RequiredArgsConstructor;
@@ -138,7 +139,9 @@ public class OrderUseCases {
         order.setStatus(orderDTO.getStatus());
         order.setStaff(staff);
         order.setItems(items);
+
         tableData.setOrderStatus(order.getStatus());
+        tableData.setTableStatus(TableStatus.OCCUPIED);
         tableData.getOrders().add(order);
         order = orderRepository.save(order);
 
