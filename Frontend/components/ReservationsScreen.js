@@ -1,23 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Button } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './config/api';
+import { useNavigation } from '@react-navigation/native';
+
+const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED'];
 
 const ReservationsScreen = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+
+  const navigation = useNavigation();
 
   useEffect(() => {
     checkToken();
-  }, []);
+  }, [statusFilter]);
 
   const checkToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('jwtToken');
-      console.log('Stored Token:', storedToken);
       setToken(storedToken);
 
       if (storedToken) {
@@ -36,19 +44,13 @@ const ReservationsScreen = () => {
   const fetchReservations = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/reservations');
-
-      console.log('Reservations response:', response.data);
+      const response = await api.get(`/reservations/status?status=${statusFilter}`);
       setReservations(response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching reservations:', err);
       if (err.response) {
-        console.log('Error response:', err.response.status, err.response.data);
         setError(`Failed to load reservations. Server returned ${err.response.status}`);
-      } else if (err.request) {
-        console.log('Error request:', err.request);
-        setError('No response received from server');
       } else {
         setError('An error occurred while fetching reservations');
       }
@@ -57,26 +59,57 @@ const ReservationsScreen = () => {
     }
   };
 
-  const refreshReservations = () => {
-    if (token) {
-      fetchReservations();
-    } else {
-      checkToken();
+  const openStatusModal = (reservation) => {
+    setSelectedReservation(reservation);
+    setModalVisible(true);
+  };
+
+  const changeReservationStatus = async (newStatus) => {
+    if (!selectedReservation) return;
+
+    try {
+      await api.patch(`/reservations/${selectedReservation.id}/status`, null, {
+        params: { status: newStatus }
+      });
+      setModalVisible(false);
+      fetchReservations(); // Refresh reservations after status change
+    } catch (err) {
+      console.error('Error updating reservation status:', err);
+      setModalVisible(false);
+      alert('Failed to update status.');
     }
   };
 
   const renderItem = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Title>Reservation #{item.id}</Title>
-        <Paragraph>Customer: {item.customerName}</Paragraph>
-        <Paragraph>Table ID: {item.tableId}</Paragraph>
-        <Paragraph>Start: {new Date(item.startTime).toLocaleString()}</Paragraph>
-        <Paragraph>End: {new Date(item.endTime).toLocaleString()}</Paragraph>
-        <Paragraph>Status: {item.status}</Paragraph>
-      </Card.Content>
-    </Card>
+    <TouchableOpacity onPress={() => openStatusModal(item)}>
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title>{`Reservation #${item.id}`}</Title>
+          <Paragraph>{`Customer: ${item.customerName || 'N/A'}`}</Paragraph>
+          <Paragraph>{`Table ID: ${item.tableId}`}</Paragraph>
+          <Paragraph>{`Start: ${new Date(item.startTime).toLocaleString()}`}</Paragraph>
+          <Paragraph>{`End: ${new Date(item.endTime).toLocaleString()}`}</Paragraph>
+          <Paragraph>{`Status: ${item.status}`}</Paragraph>
+        </Card.Content>
+      </Card>
+    </TouchableOpacity>
   );
+
+  const renderStatusButton = (label) => (
+    <TouchableOpacity
+      key={label}
+      style={[styles.filterButton, statusFilter === label && styles.filterButtonActive]}
+      onPress={() => setStatusFilter(label)}
+    >
+      <Text style={[styles.filterText, statusFilter === label && styles.filterTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const handleAddReservation = () => {
+    navigation.navigate('AddReservation');
+  };
 
   if (loading) {
     return (
@@ -91,9 +124,8 @@ const ReservationsScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Reservations</Text>
 
-      <View style={styles.debugContainer}>
-        <Text>Token status: {token ? 'Present' : 'Not found'}</Text>
-        <Button title="Refresh Reservations" onPress={refreshReservations} />
+      <View style={styles.statusFilterContainer}>
+        {statuses.map((status) => renderStatusButton(status))}
       </View>
 
       {error ? (
@@ -101,15 +133,53 @@ const ReservationsScreen = () => {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : reservations.length === 0 ? (
-        <Text style={styles.emptyText}>No reservations found</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No reservations found</Text>
+        </View>
       ) : (
         <FlatList
           data={reservations}
           renderItem={renderItem}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={handleAddReservation}
+      >
+        <MaterialCommunityIcons name="plus" size={24} color="white" />
+      </TouchableOpacity>
+
+      {/* Modal for changing reservation status */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Reservation Status</Text>
+            {statuses.map((status) => (
+              <Pressable
+                key={status}
+                style={styles.modalButton}
+                onPress={() => changeReservationStatus(status)}
+              >
+                <Text style={styles.modalButtonText}>{status}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.modalButton, { backgroundColor: '#ccc' }]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={[styles.modalButtonText, { color: 'black' }]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -126,11 +196,30 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  debugContainer: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+  statusFilterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     marginBottom: 10,
+  },
+  filterButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#ddd',
+    margin: 4,
+  },
+  filterButtonActive: {
+    backgroundColor: '#6200ee',
+  },
+  filterText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  filterTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   listContainer: {
     paddingBottom: 20,
@@ -159,10 +248,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   emptyText: {
-    textAlign: 'center',
     fontSize: 16,
     color: '#757575',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: '#6200ee',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: 300,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  modalButton: {
+    backgroundColor: '#6200ee',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginVertical: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 

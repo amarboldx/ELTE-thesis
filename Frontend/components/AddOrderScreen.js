@@ -69,10 +69,17 @@ const AddOrderScreen = ({ navigation }) => {
 
     const staffId = await AsyncStorage.getItem('staffId');
 
+
+    const toLocalISOString = (date) => {
+      const offset = date.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(date - offset).toISOString().slice(0, -1);
+      return localISOTime;
+    };
+
     const orderPayload = {
       tableDataId: selectedTableId,
-      date: new Date().toISOString(),
-      status: "PENDING",
+      date: toLocalISOString(new Date()),
+      status: "IN_PROGRESS",
       staffId: Number(staffId),
       itemIds: itemIds,
       

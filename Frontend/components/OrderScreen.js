@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Switch, Modal, Pressable } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +16,8 @@ const OrderScreen = () => {
   const [token, setToken] = useState(null);
   const [statusFilter, setStatusFilter] = useState('IN_PROGRESS');
   const [onlyMine, setOnlyMine] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const navigation = useNavigation();
 
@@ -94,20 +96,43 @@ const OrderScreen = () => {
     return Object.entries(grouped).map(([name, count]) => `${count} x ${name}`);
   };
 
+  const openStatusModal = (order) => {
+    setSelectedOrder(order);
+    setModalVisible(true);
+  };
+
+  const changeOrderStatus = async (newStatus) => {
+    if (!selectedOrder) return;
+
+    try {
+      await api.patch(`/order/${selectedOrder.id}/status`, null, {
+        params: { status: newStatus }
+      });
+      setModalVisible(false);
+      fetchOrders(); // refresh orders after change
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      setModalVisible(false);
+      alert('Failed to update status.');
+    }
+  };
+
   const renderItem = ({ item }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Title>Order #{item.id}</Title>
-        <Paragraph>Table ID: {item.tableDataId}</Paragraph>
-        <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
-        <Paragraph>Status: {item.status}</Paragraph>
-        <Paragraph>Staff ID: {item.staffId}</Paragraph>
-        <Paragraph>Ordered Items:</Paragraph>
-        {groupItems(item.itemIds).map((groupedItem, index) => (
-          <Text key={index} style={styles.itemText}>{groupedItem}</Text>
-        ))}
-      </Card.Content>
-    </Card>
+    <TouchableOpacity onPress={() => openStatusModal(item)}>
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title>Order #{item.id}</Title>
+          <Paragraph>Table ID: {item.tableDataId}</Paragraph>
+          <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
+          <Paragraph>Status: {item.status}</Paragraph>
+          <Paragraph>Staff ID: {item.staffId}</Paragraph>
+          <Paragraph>Ordered Items:</Paragraph>
+          {groupItems(item.itemIds).map((groupedItem, index) => (
+            <Text key={index} style={styles.itemText}>{groupedItem}</Text>
+          ))}
+        </Card.Content>
+      </Card>
+    </TouchableOpacity>
   );
 
   const renderStatusButton = (label) => (
@@ -176,6 +201,35 @@ const OrderScreen = () => {
           <MaterialCommunityIcons name="plus" size={24} color="white" />
         </View>
       </TouchableOpacity>
+
+      {/* Modal for changing status */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Order Status</Text>
+            {statuses.map((status) => (
+              <Pressable
+                key={status}
+                style={styles.modalButton}
+                onPress={() => changeOrderStatus(status)}
+              >
+                <Text style={styles.modalButtonText}>{status.replace('_', ' ')}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.modalButton, { backgroundColor: '#ccc' }]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={[styles.modalButtonText, { color: 'black' }]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -275,6 +329,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: 300,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  modalButton: {
+    backgroundColor: '#6200ee',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginVertical: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 

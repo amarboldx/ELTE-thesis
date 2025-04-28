@@ -8,6 +8,7 @@ import { AuthContext } from './context/AuthContext';
 import LoginScreen from './LoginScreen';
 import HomeScreen from './HomeScreen';
 import AddOrderScreen from './AddOrderScreen';
+import AddReservationScreen from './AddReservationScreen ';
 
 
 const Stack = createStackNavigator();
@@ -47,6 +48,8 @@ const AppNavigator = () => {
         )}
 
         <Stack.Screen name="AddOrder" component={AddOrderScreen} />
+
+        <Stack.Screen name="AddReservation" component={AddReservationScreen} />
       
       </Stack.Navigator>
 
