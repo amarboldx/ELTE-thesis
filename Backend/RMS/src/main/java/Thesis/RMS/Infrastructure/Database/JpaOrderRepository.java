@@ -35,4 +35,14 @@ public interface JpaOrderRepository extends JpaRepository<Order, Long>, OrderRep
     @NonNull
     List<Order> findByStatus(@NonNull OrderStatus status);
 
+    @Override
+    @NonNull
+    @Query("SELECT o FROM Order o WHERE o.staff.staffId = :staffId")
+    List<Order> findByStaffId(@NonNull Long staffId);
+
+    @Override
+    @NonNull
+    @Query("SELECT o FROM Order o WHERE o.staff.staffId = :staffId AND o.status = :status")
+    List<Order> findByStaffIdAndStatus(@NonNull Long staffId, @NonNull OrderStatus status);
+
 }

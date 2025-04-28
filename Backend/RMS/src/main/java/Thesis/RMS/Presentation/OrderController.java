@@ -38,6 +38,27 @@ public class OrderController {
     }
 
     @Transactional
+    @GetMapping("/staff/current")
+    public ResponseEntity<List<OrderDTO>> getOrdersByStaffId() {
+        return ResponseEntity.ok(orderUseCases.getOrdersForCurrentStaff());
+    }
+
+    @Transactional
+    @GetMapping("/staff/status/{status}")
+    public ResponseEntity<List<OrderDTO>> getOrdersByStatusForCurrentStaff(@PathVariable String status) {
+        OrderStatus orderStatus;
+        try {
+            orderStatus = OrderStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        List<OrderDTO> orders = orderUseCases.getOrdersByStatusForCurrentStaff(orderStatus);
+        return ResponseEntity.ok(orders);
+    }
+
+
+    @Transactional
     @GetMapping("/status/{status}")
     public ResponseEntity<List<OrderDTO>> getOrdersByStatus(@PathVariable OrderStatus status) {
         return ResponseEntity.ok(orderUseCases.getOrdersByStatus(status));

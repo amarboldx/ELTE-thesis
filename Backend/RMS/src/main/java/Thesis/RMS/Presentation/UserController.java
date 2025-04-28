@@ -4,6 +4,7 @@ import Thesis.RMS.Application.DTO.*;
 import Thesis.RMS.Application.DTO.Request.ChangePasswordRequest;
 import Thesis.RMS.Application.DTO.Request.LoginRequest;
 import Thesis.RMS.Application.DTO.Request.LoginResponse;
+import Thesis.RMS.Application.UseCases.StaffUseCases;
 import Thesis.RMS.Application.UseCases.UserService;
 import Thesis.RMS.Infrastructure.Security.JwtUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ public class UserController {
     private final UserService userService;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
+    private final StaffUseCases staffUseCases;
 
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@RequestBody UserDTO userDTO) {
@@ -46,7 +48,9 @@ public class UserController {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         String jwt = jwtUtils.generateTokenFromUserDetails(userDetails);
 
-        return ResponseEntity.ok(new LoginResponse(jwt, userDetails.getUsername(), convertAuthorities(userDetails)));
+        Long staffId = staffUseCases.getStaffIdByUsername(userDetails.getUsername());
+
+        return ResponseEntity.ok(new LoginResponse(jwt, userDetails.getUsername(), convertAuthorities(userDetails), staffId));
     }
 
     @PostMapping("/change-password")

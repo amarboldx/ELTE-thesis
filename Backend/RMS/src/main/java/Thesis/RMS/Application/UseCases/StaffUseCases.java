@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +65,19 @@ public class StaffUseCases {
         Optional<Staff> staff = staffRepository.findById(id);
         return staff.map(this::toStaffResponseDTO);
     }
+
+    public Long getStaffIdByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        if (user.getStaff() == null) {
+            throw new IllegalStateException("User is not linked to a staff member");
+        }
+
+        return user.getStaff().getStaffId();
+    }
+
+
 
 
     public List<StaffResponseDTO> getAllStaff() {

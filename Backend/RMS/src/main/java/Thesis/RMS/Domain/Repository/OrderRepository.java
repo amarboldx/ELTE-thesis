@@ -13,4 +13,6 @@ public interface OrderRepository {
     void deleteById(Long id);
     List<Order> findAll();
     List<Order> findByStatus(OrderStatus status);
+    List<Order> findByStaffId(Long staffId);
+    List<Order> findByStaffIdAndStatus(Long staffId, OrderStatus status);
 }

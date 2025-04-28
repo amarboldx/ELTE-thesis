@@ -2,16 +2,11 @@ package Thesis.RMS.Application.UseCases;
 
 import Thesis.RMS.Application.DTO.OrderDTO;
 import Thesis.RMS.Domain.Enums.OrderStatus;
-import Thesis.RMS.Domain.Model.Item;
-import Thesis.RMS.Domain.Model.Order;
-import Thesis.RMS.Domain.Model.Staff;
-import Thesis.RMS.Domain.Model.TableData;
-import Thesis.RMS.Domain.Repository.ItemRepository;
-import Thesis.RMS.Domain.Repository.OrderRepository;
-import Thesis.RMS.Domain.Repository.StaffRepository;
-import Thesis.RMS.Domain.Repository.TableRepository;
+import Thesis.RMS.Domain.Model.*;
+import Thesis.RMS.Domain.Repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +21,7 @@ public class OrderUseCases {
     private final ItemRepository itemRepository;
     private final TableRepository tableDataRepository;
     private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
 
 
     private OrderDTO convertToDTO(Order order) {
@@ -74,6 +70,28 @@ public class OrderUseCases {
                 .collect(Collectors.toList());
     }
 
+    public List<OrderDTO> getOrdersForCurrentStaff() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("User not found"));
+        Staff staff = staffRepository.findByUser(user).orElseThrow(() -> new RuntimeException("Staff not found"));
+
+        List<Order> orders = orderRepository.findByStaffId(staff.getStaffId());
+        return orders.stream()
+                .map(this::convertToDTO)
+                .toList();
+    }
+
+    public List<OrderDTO> getOrdersByStatusForCurrentStaff(OrderStatus status) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("User not found"));
+        Staff staff = staffRepository.findByUser(user).orElseThrow(() -> new RuntimeException("Staff not found"));
+
+        List<Order> orders = orderRepository.findByStaffIdAndStatus(staff.getStaffId(), status);
+        return orders.stream().map(this::convertToDTO).toList();
+    }
+
+
+
     public List<OrderDTO> getOrderByTableNumber(int tableNumber) {
         return orderRepository.findByTableNumber(tableNumber).stream()
                 .map(this::convertToDTO)
@@ -120,8 +138,10 @@ public class OrderUseCases {
         order.setStatus(orderDTO.getStatus());
         order.setStaff(staff);
         order.setItems(items);
-
+        tableData.setOrderStatus(order.getStatus());
+        tableData.getOrders().add(order);
         order = orderRepository.save(order);
+
 
         tableData.setAssignedStaff(staff);
         tableDataRepository.save(tableData);
