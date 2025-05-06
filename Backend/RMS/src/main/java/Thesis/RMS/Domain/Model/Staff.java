@@ -23,10 +23,10 @@ public class Staff {
     @Column(nullable = false)
     private Role role;
 
-    @OneToMany(mappedBy = "staff", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "staff", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Shift> shifts;
 
-    @OneToMany(mappedBy = "assignedStaff", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "assignedStaff", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<TableData> assignedTables;
 
     @OneToOne

@@ -111,6 +111,9 @@ public class StaffUseCases {
     }
 
     private StaffResponseDTO toStaffResponseDTO(Staff staff) {
+        staff.getShifts().size();
+        staff.getAssignedTables().size();
+
         StaffResponseDTO responseDTO = new StaffResponseDTO();
         responseDTO.setStaffId(staff.getStaffId());
         responseDTO.setName(staff.getName());
@@ -128,4 +131,5 @@ public class StaffUseCases {
 
         return responseDTO;
     }
+
 }

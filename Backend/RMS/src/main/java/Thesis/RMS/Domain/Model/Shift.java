@@ -1,5 +1,6 @@
 package Thesis.RMS.Domain.Model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -19,9 +20,11 @@ public class Shift {
     @JoinColumn(name = "staff_id", nullable = false)
     private Staff staff;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     @Column(nullable = false)
     private LocalDateTime startTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     @Column(nullable = false)
     private LocalDateTime endTime;
 }

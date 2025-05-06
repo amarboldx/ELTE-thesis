@@ -24,18 +24,16 @@ public class ReservationUseCases {
     private final TableRepository tableDataRepository;
 
     public ReservationResponseDTO createReservation(ReservationDTO reservationDTO) {
-        // 1. Check if table exists
         Optional<TableData> tableDataOptional = tableDataRepository.findById(reservationDTO.getTableId());
         if (tableDataOptional.isEmpty()) {
             throw new IllegalArgumentException("Table not found");
         }
 
-        // 2. Validate time range
         if (reservationDTO.getEndTime().isBefore(reservationDTO.getStartTime())) {
             throw new IllegalArgumentException("End time must be after start time");
         }
 
-        // 3. Check for conflicts (assuming UTC timezone)
+
         boolean hasConflict = reservationRepository.existsByTableDataAndTimeRange(
                 tableDataOptional.get(),
                 reservationDTO.getStartTime(),
