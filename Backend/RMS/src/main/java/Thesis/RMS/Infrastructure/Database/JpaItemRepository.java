@@ -4,6 +4,7 @@ import Thesis.RMS.Domain.Enums.Allergen_List;
 import Thesis.RMS.Domain.Model.Item;
 import Thesis.RMS.Domain.Repository.ItemRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 
@@ -24,6 +25,8 @@ public interface JpaItemRepository extends JpaRepository<Item, Long>, ItemReposi
     List<Item> findAll();
 
     @Override
+    @Modifying
+    @Query("DELETE FROM Item i WHERE i.id = :id")
     void deleteById(@NonNull Long id);
 
     @Override

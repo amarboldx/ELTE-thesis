@@ -6,6 +6,7 @@ import Thesis.RMS.Domain.Enums.TableStatus;
 import Thesis.RMS.Domain.Model.TableData;
 import Thesis.RMS.Domain.Repository.TableRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 
@@ -44,6 +45,8 @@ public interface JpaTableRepository extends JpaRepository<TableData, Long>, Tabl
     List<TableData> findByOrderStatus(OrderStatus status);
 
     @Override
+    @Modifying
+    @Query("DELETE FROM TableData t WHERE t.id = :tableId")
     void deleteById(@NonNull Long tableId);
 
     @Override

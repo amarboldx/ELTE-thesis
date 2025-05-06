@@ -4,6 +4,7 @@ import Thesis.RMS.Domain.Enums.OrderStatus;
 import Thesis.RMS.Domain.Model.Order;
 import Thesis.RMS.Domain.Repository.OrderRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 
@@ -29,6 +30,8 @@ public interface JpaOrderRepository extends JpaRepository<Order, Long>, OrderRep
     List<Order> findByTableNumber(@NonNull int tableNumber);
 
     @Override
+    @Modifying
+    @Query("DELETE FROM Order o WHERE o.id = :id")
     void deleteById(@NonNull Long id);
 
     @Override

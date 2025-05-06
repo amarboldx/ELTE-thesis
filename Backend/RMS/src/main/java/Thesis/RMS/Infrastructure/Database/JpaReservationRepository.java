@@ -5,6 +5,7 @@ import Thesis.RMS.Domain.Model.Reservation;
 import Thesis.RMS.Domain.Model.TableData;
 import Thesis.RMS.Domain.Repository.ReservationRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
@@ -41,6 +42,8 @@ public interface JpaReservationRepository extends JpaRepository<Reservation, Lon
     List<Reservation> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
 
     @Override
+    @Modifying
+    @Query("DELETE FROM Reservation r WHERE r.id = ?1")
     void deleteById(@NonNull Long id);
 
     @Override
