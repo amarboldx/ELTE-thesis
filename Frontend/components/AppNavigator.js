@@ -10,6 +10,8 @@ import HomeScreen from './HomeScreen';
 import AddOrderScreen from './AddOrderScreen';
 import AddReservationScreen from './AddReservationScreen ';
 import AddMenuScreen from './AddMenuScreen';
+import AddShiftScreen from './AddShiftScreen';
+import EditShiftScreen from './EditShiftScreen';
 
 
 const Stack = createStackNavigator();
@@ -48,6 +50,8 @@ const AppNavigator = () => {
                 <Stack.Screen name="AddOrder" component={AddOrderScreen} />
                 <Stack.Screen name="AddReservation" component={AddReservationScreen} />
                 <Stack.Screen name="AddMenu" component={AddMenuScreen} />
+                <Stack.Screen name="AddShift" component={AddShiftScreen} />
+                <Stack.Screen name="EditShift" component={EditShiftScreen} />
               </>
             ) : (
               <Stack.Screen name="Login" component={LoginScreen} />

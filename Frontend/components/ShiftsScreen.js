@@ -31,7 +31,9 @@ import {
     startOfMonth,
     endOfMonth,
     isSameMonth,
-    isToday
+    isToday,
+    addMonths, 
+    subMonths
 } from 'date-fns';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -42,7 +44,7 @@ const DAY_HEADER_HEIGHT = 50;
 const WEEK_HEADER_HEIGHT = 60;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const DAY_COLUMN_WIDTH = (SCREEN_WIDTH - 64) / 7;
-const MONTH_VIEW_HEIGHT = 200;
+const MONTH_VIEW_HEIGHT = 300;
 
 const ShiftsScreen = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -51,6 +53,7 @@ const ShiftsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [token, setToken] = useState(null);
+    const [userRoles, setUserRoles] = useState([]);
     const [showMonthView, setShowMonthView] = useState(false);
     const swipeAnim = useRef(new Animated.Value(0)).current;
     const [selectedWeekday, setSelectedWeekday] = useState(getDay(new Date()));
@@ -177,16 +180,25 @@ const ShiftsScreen = () => {
         checkTokenAndFetchData();
     }, []);
 
+    const isAdmin = userRoles.includes('ADMIN');
+
     const checkTokenAndFetchData = async () => {
         setLoading(true);
         setError(null);
         try {
             const storedToken = await AsyncStorage.getItem('jwtToken');
+            const storedRoles = await AsyncStorage.getItem('roles');
             setToken(storedToken);
             if (storedToken) {
                 await fetchShiftsAndStaff();
             } else {
                 setError('No authentication token found. Please log in again.');
+                setLoading(false);
+            }
+            if (storedRoles) {
+                setUserRoles(JSON.parse(storedRoles));
+            } else {
+                setError('No user roles found. Please log in again.');
                 setLoading(false);
             }
         } catch {
@@ -235,6 +247,8 @@ const ShiftsScreen = () => {
             setLoading(false);
         }
     };
+
+    
 
     const goToPreviousDay = () => {
         setCurrentDate(prevDate => {
@@ -314,35 +328,62 @@ const ShiftsScreen = () => {
         } catch {
             return null;
         }
-
+    
         if (!isSameDay(startTime, dayDate)) return null;
-
+    
         const startHour = getHours(startTime);
         const startMinute = getMinutes(startTime);
         const endHour = getHours(endTime);
         const endMinute = getMinutes(endTime);
-
+    
         const topOffset = (startHour * 60 + startMinute) / 60 * HOUR_HEIGHT;
         let height = (differenceInMinutes(endTime, startTime) / 60) * HOUR_HEIGHT;
         height = Math.max(height, 15);
-
+    
         const staffName = staffDataCache[shift.staffId] || `Staff ${shift.staffId}`;
-
+    
+        // Find all shifts that overlap with this one
+        const overlappingShifts = shifts.filter(s => {
+            try {
+                const sStart = parseISO(s.startTime);
+                const sEnd = parseISO(s.endTime);
+                return isSameDay(sStart, dayDate) && 
+                       ((sStart < endTime && sEnd > startTime) || 
+                        (s.startTime === shift.startTime && s.endTime === shift.endTime));
+            } catch {
+                return false;
+            }
+        });
+    
+        // Calculate position and width based on overlaps
+        const totalOverlaps = overlappingShifts.length;
+        const overlapIndex = overlappingShifts.findIndex(s => s.shiftId === shift.shiftId);
+        
+        // Calculate width and position to use full day column width
+        const widthPercentage = 0.9; // Use 90% of available width
+        const leftOffsetPercentage = 0.05 + (overlapIndex * (0.9 / totalOverlaps)); // Distribute evenly
+        
         return (
-            <View
+            <TouchableOpacity
                 key={shift.shiftId}
                 style={[
                     styles.shiftBlock,
-                    { top: topOffset, height }
+                    { 
+                        top: topOffset, 
+                        height,
+                        left: `${leftOffsetPercentage * 100}%`,
+                        width: `${(widthPercentage / totalOverlaps) * 100}%`,
+                    }
                 ]}
+                onPress={() => navigation.navigate('EditShift', { shiftId: shift.shiftId })}
             >
                 <Text style={styles.shiftTextName} numberOfLines={1}>{staffName}</Text>
                 <Text style={styles.shiftTextTime}>
                     {format(startTime, 'HH:mm')} - {format(endTime, 'HH:mm')}
                 </Text>
-            </View>
+            </TouchableOpacity>
         );
-    }, [staffDataCache]);
+    }, [staffDataCache, shifts, navigation]);
 
     const renderDayHeaders = () => {
         return (
@@ -536,7 +577,7 @@ const ShiftsScreen = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={goToPreviousWeek} style={styles.navButton}>
+                <TouchableOpacity onPress={showMonthView ? goToPreviousMonth : goToPreviousWeek}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color="black" />
                 </TouchableOpacity>
                 
@@ -545,11 +586,13 @@ const ShiftsScreen = () => {
                     style={styles.monthToggleButton}
                 >
                     <Text style={styles.monthToggleText}>
-                        {format(currentDate, 'MMMM yyyy')}
+                        {showMonthView
+                            ? format(currentMonth, 'MMMM yyyy')
+                            : format(currentDate, 'MMMM yyyy')}
                     </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity onPress={goToNextWeek} style={styles.navButton}>
+                
+                <TouchableOpacity onPress={showMonthView ? goToNextMonth : goToNextWeek}>
                     <MaterialCommunityIcons name="arrow-right" size={24} color="black" />
                 </TouchableOpacity>
             </View>
@@ -595,12 +638,14 @@ const ShiftsScreen = () => {
                 </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('AddShift')}
-            >
-                <MaterialCommunityIcons name="plus" size={24} color="white" />
-            </TouchableOpacity>
+            {isAdmin && (
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => navigation.navigate('AddShift')}
+                >
+                    <MaterialCommunityIcons name="plus" size={24} color="white" />
+                </TouchableOpacity>
+            )}
         </View>
     );
 };
@@ -695,8 +740,6 @@ const styles = StyleSheet.create({
     },
     shiftBlock: {
         position: 'absolute',
-        left: 2,
-        right: 2,
         backgroundColor: 'rgba(100, 150, 255, 0.8)',
         borderRadius: 4,
         paddingVertical: 2,
