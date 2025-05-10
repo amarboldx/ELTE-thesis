@@ -20,6 +20,8 @@
     "@react-navigation/native": "^7.0.15",
     "@react-navigation/stack": "^7.1.2",
     "axios": "^1.8.3",
+    "babel-preset-expo": "^13.1.11",
+    "date-fns": "^4.1.0",
     "react": "19.0.0",
     "react-native": "0.78.0",
     "react-native-gesture-handler": "^2.25.0",

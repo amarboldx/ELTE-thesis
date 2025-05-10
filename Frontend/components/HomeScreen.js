@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BottomNavigation } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AuthContext } from './context/AuthContext';
-
 
 import OrderScreen from './OrderScreen';
 import ReservationsScreen from './ReservationsScreen';
@@ -12,11 +11,14 @@ import MenuScreen from './MenuScreen';
 import ShiftsScreen from './ShiftsScreen';
 import ProfileScreen from './ProfileScreen';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => { 
   const { setIsLoggedIn } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [roles, setRoles] = useState([]);
   const [index, setIndex] = useState(0);
+
+  const isIOS = Platform.OS === 'ios';
+  const bottomBarHeight = isIOS ? 80 : 60;
 
   useEffect(() => {
     const getUserInfo = async () => {
@@ -36,7 +38,6 @@ const HomeScreen = () => {
     try {
       await AsyncStorage.clear();
       setIsLoggedIn(false);
-
       navigation.reset({
         index: 0,
         routes: [{ name: 'Login' }],
@@ -74,7 +75,7 @@ const HomeScreen = () => {
         navigationState={{ index, routes }}
         onIndexChange={setIndex}
         renderScene={renderScene}
-        barStyle={{ backgroundColor: '#6200ee' }}
+        barStyle={[styles.bottomBar, { height: bottomBarHeight }]} 
         renderIcon={({ route, focused, color }) => (
           <MaterialCommunityIcons
             name={route.icon}
@@ -92,6 +93,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  bottomBar: {
+    backgroundColor: '#6200ee',
+    marginBottom: Platform.OS === 'ios' ? 20 : 20,
   },
 });
 

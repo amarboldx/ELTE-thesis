@@ -1,27 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { Card, Title, Paragraph } from 'react-native-paper';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  ActivityIndicator, 
+  TouchableOpacity, 
+  Modal, 
+  Pressable,
+  Alert,
+  ToastAndroid,
+  Platform,
+  Dimensions,
+  RefreshControl,
+} from 'react-native';
+import { Card, Title, Paragraph, Snackbar } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RectButton, Swipeable } from 'react-native-gesture-handler';
 import api from './config/api';
 import { useNavigation } from '@react-navigation/native';
 
+const { width } = Dimensions.get('window');
 const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED'];
 
 const ReservationsScreen = () => {
-  const [reservations, setReservations] = useState([]);
+  const [allReservations, setAllReservations] = useState([]);
+  const [filteredReservations, setFilteredReservations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(null);
   const [statusFilter, setStatusFilter] = useState('PENDING');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const navigation = useNavigation();
 
   useEffect(() => {
     checkToken();
-  }, [statusFilter]);
+  }, []);
+
+  useEffect(() => {
+    if (allReservations.length > 0) {
+      applyFilters();
+    }
+  }, [statusFilter, allReservations]);
 
   const checkToken = async () => {
     try {
@@ -44,55 +70,180 @@ const ReservationsScreen = () => {
   const fetchReservations = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/reservations/status?status=${statusFilter}`);
-      setReservations(response.data);
+      const response = await api.get('/reservations');
+      setAllReservations(response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching reservations:', err);
-      if (err.response) {
-        setError(`Failed to load reservations. Server returned ${err.response.status}`);
-      } else {
-        setError('An error occurred while fetching reservations');
-      }
+      setError(err.response ? `Failed to load reservations. Server returned ${err.response.status}` : 'An error occurred while fetching reservations');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const openStatusModal = (reservation) => {
-    setSelectedReservation(reservation);
-    setModalVisible(true);
+  const applyFilters = () => {
+    let result = [...allReservations];
+    
+    if (statusFilter) {
+      result = result.filter(reservation => reservation.status === statusFilter);
+    }
+    
+    setFilteredReservations(result);
   };
 
-  const changeReservationStatus = async (newStatus) => {
-    if (!selectedReservation) return;
+  const showSnackbar = (message) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  };
 
+  const getNextStatus = (currentStatus) => {
+    switch (currentStatus) {
+      case 'PENDING': return 'CONFIRMED';
+      case 'CONFIRMED': return 'CANCELLED';
+      default: return currentStatus;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'PENDING': return '#FF9800';
+      case 'CONFIRMED': return '#4CAF50';
+      case 'CANCELLED': return '#F44336';
+      default: return '#000';
+    }
+  };
+
+  const getCardBackground = (status) => {
+    switch (status) {
+      case 'CONFIRMED': return '#e8f5e9';
+      case 'CANCELLED': return '#ffebee';
+      default: return 'white';
+    }
+  };
+
+  const changeReservationStatus = async (reservation, newStatus) => {
+    const originalReservations = [...allReservations];
+    
     try {
-      await api.patch(`/reservations/${selectedReservation.id}/status`, null, {
-        params: { status: newStatus }
+      // Optimistic update
+      const updatedReservations = allReservations.map(r => 
+        r.id === reservation.id ? { ...r, status: newStatus } : r
+      );
+      setAllReservations(updatedReservations);
+      
+      if (modalVisible) {
+        setModalVisible(false);
+      }
+
+      await api.patch(`/reservations/${reservation.id}/status`, null, {
+        params: { status: newStatus },
       });
-      setModalVisible(false);
-      fetchReservations(); // Refresh reservations after status change
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Reservation #${reservation.id} updated to ${newStatus}`, ToastAndroid.SHORT);
+      }
     } catch (err) {
       console.error('Error updating reservation status:', err);
-      setModalVisible(false);
-      alert('Failed to update status.');
+      setAllReservations(originalReservations); // Revert on error
+      showSnackbar('Failed to update reservation status');
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchReservations();
+  };
+
+  const renderRightActions = (reservation, progress, dragX) => {
+    if (reservation.status === 'CANCELLED') return null;
+    
+    const nextStatus = getNextStatus(reservation.status);
+    const bgColor = nextStatus === 'CONFIRMED' ? '#4CAF50' : '#F44336';
+
+    return (
+      <RectButton
+        style={[styles.actionContainer, { backgroundColor: bgColor }]}
+        onPress={() => changeReservationStatus(reservation, nextStatus)}
+      >
+        <Text style={styles.actionText}>{nextStatus}</Text>
+      </RectButton>
+    );
+  };
+
+  const renderLeftActions = (reservation, progress, dragX) => {
+    if (reservation.status === 'CANCELLED') return null;
+
+    return (
+      <RectButton
+        style={[styles.actionContainer, { backgroundColor: '#F44336' }]}
+        onPress={() => {
+          Alert.alert(
+            'Cancel Reservation',
+            'Are you sure you want to cancel this reservation?',
+            [
+              { text: 'No', style: 'cancel' },
+              { text: 'Yes', onPress: () => changeReservationStatus(reservation, 'CANCELLED') }
+            ]
+          );
+        }}
+      >
+        <Text style={styles.actionText}>CANCEL</Text>
+      </RectButton>
+    );
   };
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity onPress={() => openStatusModal(item)}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>{`Reservation #${item.id}`}</Title>
-          <Paragraph>{`Customer: ${item.customerName || 'N/A'}`}</Paragraph>
-          <Paragraph>{`Table ID: ${item.tableId}`}</Paragraph>
-          <Paragraph>{`Start: ${new Date(item.startTime).toLocaleString()}`}</Paragraph>
-          <Paragraph>{`End: ${new Date(item.endTime).toLocaleString()}`}</Paragraph>
-          <Paragraph>{`Status: ${item.status}`}</Paragraph>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
+    <View style={styles.swipeableOuterContainer}>
+      <Swipeable
+        renderRightActions={(progress, dragX) => renderRightActions(item, progress, dragX)}
+        renderLeftActions={(progress, dragX) => renderLeftActions(item, progress, dragX)}
+        onSwipeableRightOpen={() => {
+          if (item.status !== 'CANCELLED') {
+            const nextStatus = getNextStatus(item.status);
+            changeReservationStatus(item, nextStatus);
+          }
+        }}
+        onSwipeableLeftOpen={() => {
+          if (item.status !== 'CANCELLED') {
+            Alert.alert(
+              'Cancel Reservation',
+              'Are you sure you want to cancel this reservation?',
+              [
+                { text: 'No', style: 'cancel', onPress: () => {} },
+                { text: 'Yes', onPress: () => changeReservationStatus(item, 'CANCELLED') }
+              ]
+            );
+          }
+        }}
+        friction={2}
+        rightThreshold={40}
+        leftThreshold={40}
+        containerStyle={styles.swipeableContainer}
+      >
+        <TouchableOpacity 
+          onPress={() => {
+            setSelectedReservation(item);
+            setModalVisible(true);
+          }}
+          activeOpacity={0.9}
+        >
+          <Card style={[styles.card, { backgroundColor: getCardBackground(item.status) }]}>
+            <Card.Content>
+              <Title>{`Reservation #${item.id}`}</Title>
+              <Paragraph>{`Customer: ${item.customerName || 'N/A'}`}</Paragraph>
+              <Paragraph>{`Table ID: ${item.tableId}`}</Paragraph>
+              <Paragraph>{`Start: ${new Date(item.startTime).toLocaleString()}`}</Paragraph>
+              <Paragraph>{`End: ${new Date(item.endTime).toLocaleString()}`}</Paragraph>
+              <View style={styles.statusRow}>
+                <Text>Status: </Text>
+                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
+              </View>
+            </Card.Content>
+          </Card>
+        </TouchableOpacity>
+      </Swipeable>
+    </View>
   );
 
   const renderStatusButton = (label) => (
@@ -111,7 +262,27 @@ const ReservationsScreen = () => {
     navigation.navigate('AddReservation');
   };
 
-  if (loading) {
+  const deleteReservation = async (reservationId) => {
+    const originalReservations = [...allReservations];
+    
+    try {
+      const updatedReservations = allReservations.filter(r => r.id !== reservationId);
+      setAllReservations(updatedReservations);
+      setModalVisible(false);
+  
+      await api.delete(`/reservations/${reservationId}`);
+  
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Reservation #${reservationId} deleted`, ToastAndroid.SHORT);
+      }
+    } catch (err) {
+      console.error('Error deleting reservation:', err);
+      setAllReservations(originalReservations);
+      showSnackbar('Failed to delete reservation');
+    }
+  };
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#6200ee" />
@@ -132,27 +303,31 @@ const ReservationsScreen = () => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : reservations.length === 0 ? (
+      ) : filteredReservations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No reservations found</Text>
         </View>
       ) : (
         <FlatList
-          data={reservations}
+          data={filteredReservations}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#6200ee']}
+              tintColor={'#6200ee'}
+            />
+          }
         />
       )}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={handleAddReservation}
-      >
+      <TouchableOpacity style={styles.fab} onPress={handleAddReservation}>
         <MaterialCommunityIcons name="plus" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* Modal for changing reservation status */}
       <Modal
         transparent
         animationType="slide"
@@ -165,12 +340,36 @@ const ReservationsScreen = () => {
             {statuses.map((status) => (
               <Pressable
                 key={status}
-                style={styles.modalButton}
-                onPress={() => changeReservationStatus(status)}
+                style={[styles.modalButton, { backgroundColor: getStatusColor(status) }]}
+                onPress={() => {
+                  changeReservationStatus(selectedReservation, status);
+                  setModalVisible(false);
+                }}
               >
                 <Text style={styles.modalButtonText}>{status}</Text>
               </Pressable>
             ))}
+
+            <Pressable
+              style={[styles.modalButton, { backgroundColor: '#d32f2f' }]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Reservation',
+                  'Are you sure you want to permanently delete this reservation?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Delete', 
+                      onPress: () => deleteReservation(selectedReservation.id),
+                      style: 'destructive'
+                    }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.modalButtonText}>Delete Reservation</Text>
+            </Pressable>
+
             <Pressable
               style={[styles.modalButton, { backgroundColor: '#ccc' }]}
               onPress={() => setModalVisible(false)}
@@ -180,6 +379,18 @@ const ReservationsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={{
+          label: 'Dismiss',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };
@@ -200,7 +411,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   filterButton: {
     paddingVertical: 8,
@@ -225,8 +436,36 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: 0, // Removed margin since swipeable container handles it
     elevation: 2,
+    borderRadius: 8,
+    width: '100%',
+  },
+  swipeableOuterContainer: {
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 'auto'
+  },
+  actionContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    flex: 1,
+  },
+  actionText: {
+    color: 'white',
+    fontWeight: 'bold',
+    padding: 10,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  statusText: {
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   loaderContainer: {
     flex: 1,
@@ -299,6 +538,15 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: 'white',
     fontSize: 16,
+  },
+  swipeableContainer: {
+    borderRadius: 8,
+  },
+  actionButton: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

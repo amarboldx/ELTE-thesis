@@ -1,29 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Switch, Modal, Pressable } from 'react-native';
-import { Card, Title, Paragraph } from 'react-native-paper';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  ActivityIndicator, 
+  TouchableOpacity, 
+  Switch, 
+  Modal, 
+  Pressable,
+  Alert,
+  ToastAndroid,
+  Platform,
+  RefreshControl
+} from 'react-native';
+import { Card, Title, Paragraph, Snackbar } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { RectButton, Swipeable } from 'react-native-gesture-handler';
 import api from './config/api';
 
 const statuses = ['IN_PROGRESS', 'PENDING', 'COMPLETED', 'CANCELLED'];
 
 const OrderScreen = () => {
-  const [orders, setOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [itemMap, setItemMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(null);
   const [statusFilter, setStatusFilter] = useState('IN_PROGRESS');
   const [onlyMine, setOnlyMine] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [allItems, setAllItems] = useState([]);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const navigation = useNavigation();
 
   useEffect(() => {
     checkToken();
-  }, [statusFilter, onlyMine]);
+    fetchAllItems();
+  }, []);
+
+  useEffect(() => {
+    if (allOrders.length > 0) {
+      applyFilters();
+    }
+  }, [statusFilter, onlyMine, allOrders]);
 
   const checkToken = async () => {
     try {
@@ -54,20 +82,24 @@ const OrderScreen = () => {
       const allItemIds = response.data.flatMap(order => order.itemIds || []);
       await fetchItemNames(allItemIds);
 
-      // Sort orders by date (latest first)
       const sortedOrders = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-      setOrders(sortedOrders);
+      setAllOrders(sortedOrders);
       setError(null);
     } catch (err) {
       console.error('Error fetching orders:', err);
-      if (err.response) {
-        setError(`Failed to load orders. Server returned ${err.response.status}`);
-      } else {
-        setError('An error occurred while fetching orders');
-      }
+      setError(err.response ? `Failed to load orders. Server returned ${err.response.status}` : 'An error occurred while fetching orders');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchAllItems = async () => {
+    try {
+      const response = await api.get('/menu/get');
+      setAllItems(response.data);
+    } catch (err) {
+      console.error('Error fetching items:', err);
     }
   };
 
@@ -86,63 +118,356 @@ const OrderScreen = () => {
     }
   };
 
+  const applyFilters = () => {
+    let result = [...allOrders];
+    
+    // Apply status filter
+    if (statusFilter) {
+      result = result.filter(order => order.status === statusFilter);
+    }
+    
+    // Here you would apply the "onlyMine" filter if needed
+    // For example: result = result.filter(order => order.staffId === currentUserId);
+    
+    setFilteredOrders(result);
+  };
+
   const groupItems = (itemIds) => {
-    const grouped = {};
+    const itemCounts = {};
     (itemIds || []).forEach(id => {
-      const itemName = itemMap[id] || `Item ID: ${id}`;
-      grouped[itemName] = (grouped[itemName] || 0) + 1;
+      itemCounts[id] = (itemCounts[id] || 0) + 1;
     });
-
-    return Object.entries(grouped).map(([name, count]) => `${count} x ${name}`);
+    return Object.entries(itemCounts).map(([id, count]) => ({
+      id,
+      name: itemMap[id] || `Item ID: ${id}`,
+      count
+    }));
   };
 
-  const openStatusModal = (order) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
-
-  const changeOrderStatus = async (newStatus) => {
-    if (!selectedOrder) return;
-
-    try {
-      await api.patch(`/order/${selectedOrder.id}/status`, null, {
-        params: { status: newStatus }
-      });
-      setModalVisible(false);
-      fetchOrders(); // refresh orders after change
-    } catch (err) {
-      console.error('Error updating order status:', err);
-      setModalVisible(false);
-      alert('Failed to update status.');
+  const getNextStatus = (currentStatus) => {
+    switch (currentStatus) {
+      case 'IN_PROGRESS': return 'PENDING';
+      case 'PENDING': return 'COMPLETED';
+      default: return currentStatus;
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'IN_PROGRESS': return '#2196F3';
+      case 'PENDING': return '#FF9800';
+      case 'COMPLETED': return '#4CAF50';
+      case 'CANCELLED': return '#F44336';
+      default: return '#000';
+    }
+  };
+
+  const getCardBackground = (status) => {
+    switch (status) {
+      case 'COMPLETED': return '#e8f5e9';
+      case 'CANCELLED': return '#ffebee';
+      default: return 'white';
+    }
+  };
+
+  const handleStatusChange = async (order, newStatus) => {
+    const originalOrders = [...allOrders];
+    
+    try {
+      // Optimistic update
+      const updatedOrders = allOrders.map(o => 
+        o.id === order.id ? { ...o, status: newStatus } : o
+      );
+      setAllOrders(updatedOrders);
+      
+      if (modalVisible) {
+        setModalVisible(false);
+      }
+      
+      await api.patch(`/order/${order.id}/status`, null, {
+        params: { status: newStatus }
+      });
+      
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Order #${order.id} updated to ${newStatus}`, ToastAndroid.SHORT);
+      }
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      setAllOrders(originalOrders);
+      showSnackbar('Failed to update order status');
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    const originalOrders = [...allOrders];
+    
+    try {
+      const updatedOrders = allOrders.filter(o => o.id !== selectedOrder.id);
+      setAllOrders(updatedOrders);
+      setModalVisible(false);
+      
+      await api.delete(`/order/${selectedOrder.id}`);
+    } catch (err) {
+      console.error('Error deleting order:', err);
+      setAllOrders(originalOrders);
+      showSnackbar('Failed to delete order');
+    }
+  };
+
+  const showSnackbar = (message) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  };
+
+  const handleAddItem = async (itemId) => {
+    const originalOrders = [...allOrders];
+    const originalSelectedOrder = selectedOrder;
+    
+    try {
+      const updatedOrders = allOrders.map(o => {
+        if (o.id === selectedOrder.id) {
+          return { ...o, itemIds: [...(o.itemIds || []), itemId] };
+        }
+        return o;
+      });
+      
+      setAllOrders(updatedOrders);
+      
+      if (selectedOrder) {
+        setSelectedOrder({
+          ...selectedOrder,
+          itemIds: [...(selectedOrder.itemIds || []), itemId]
+        });
+      }
+      
+      await api.patch(`/order/${selectedOrder.id}/add-item`, null, {
+        params: { itemId }
+      });
+    } catch (err) {
+      console.error('Error adding item:', err);
+      setAllOrders(originalOrders);
+      setSelectedOrder(originalSelectedOrder);
+      showSnackbar('Failed to add item to order');
+    }
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    const originalOrders = [...allOrders];
+    const originalSelectedOrder = selectedOrder;
+    
+    try {
+      if (!selectedOrder) {
+        showSnackbar('No order selected');
+        return;
+      }
+  
+      const itemIndex = selectedOrder.itemIds.findIndex(id => Number(id) === Number(itemId));
+      
+      if (itemIndex === -1) {
+        showSnackbar('Item not found in order');
+        return;
+      }
+  
+      const updatedItemIds = [...selectedOrder.itemIds];
+      updatedItemIds.splice(itemIndex, 1);
+  
+      setAllOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, itemIds: updatedItemIds }
+            : order
+        )
+      );
+  
+      setSelectedOrder(prev => ({ ...prev, itemIds: updatedItemIds }));
+  
+      await api.patch(`/order/${selectedOrder.id}/remove-item`, null, {
+        params: { itemId }
+      });
+    } catch (err) {
+      console.error('Error removing item:', err);
+      setAllOrders(originalOrders);
+      setSelectedOrder(originalSelectedOrder);
+      showSnackbar(err.response?.data?.message || 'Failed to remove item');
+    }
+  };
+
+  const renderEditModal = () => {
+    const groupedItems = groupItems(selectedOrder?.itemIds);
+    
+    return (
+      <Modal
+        transparent
+        visible={editModalVisible}
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.editModalBox}>
+            <Text style={styles.modalTitle}>Edit Order #{selectedOrder?.id}</Text>
+            
+            <Text style={styles.sectionTitle}>Current Items:</Text>
+            {groupedItems.length > 0 ? (
+              groupedItems.map((item, index) => (
+                <View key={`${item.id}-${index}`} style={styles.itemRow}>
+                  <Text style={styles.itemName}>{item.name} (x{item.count})</Text>
+                  <View style={styles.quantityControls}>
+                    <TouchableOpacity 
+                      style={[styles.quantityButton, styles.removeButton]}
+                      onPress={() => handleRemoveItem(item.id)}
+                    >
+                      <MaterialCommunityIcons name="minus" size={20} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.quantityButton, styles.addButton]}
+                      onPress={() => handleAddItem(item.id)}
+                    >
+                      <MaterialCommunityIcons name="plus" size={20} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No items in this order</Text>
+            )}
+            
+            <Text style={styles.sectionTitle}>Add New Items:</Text>
+            <FlatList
+              data={allItems}
+              renderItem={({ item }) => (
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>{item.name} (${item.price})</Text>
+                  <TouchableOpacity 
+                    style={[styles.quantityButton, styles.addButton]}
+                    onPress={() => handleAddItem(item.id)}
+                  >
+                    <MaterialCommunityIcons name="plus" size={20} color="white" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              keyExtractor={item => item.id.toString()}
+              maxHeight={200}
+            />
+            
+            <Pressable
+              style={[styles.modalOption, { backgroundColor: '#6200ee', marginTop: 20 }]}
+              onPress={() => setEditModalVisible(false)}
+            >
+              <Text style={styles.modalOptionText}>Done</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderRightActions = (item) => {
+    if (item.status === 'COMPLETED') return null;
+    
+    const nextStatus = getNextStatus(item.status);
+    const bgColor = nextStatus === 'PENDING' ? '#FF9800' : '#4CAF50';
+
+    return (
+      <RectButton
+        style={[styles.actionContainer, { backgroundColor: bgColor }]}
+        onPress={() => handleStatusChange(item, nextStatus)}
+      >
+        <Text style={styles.actionText}>{nextStatus.replace('_', ' ')}</Text>
+      </RectButton>
+    );
+  };
+
+  const renderLeftActions = (item) => {
+    if (item.status === 'COMPLETED') return null;
+
+    return (
+      <RectButton
+        style={[styles.actionContainer, { backgroundColor: '#F44336' }]}
+        onPress={() => {
+          Alert.alert(
+            'Cancel Order',
+            'Are you sure you want to cancel this order?',
+            [
+              { text: 'No', style: 'cancel' },
+              { text: 'Yes', onPress: () => handleStatusChange(item, 'CANCELLED') }
+            ]
+          );
+        }}
+      >
+        <Text style={styles.actionText}>CANCEL</Text>
+      </RectButton>
+    );
+  };
+
   const renderItem = ({ item }) => (
-    <TouchableOpacity onPress={() => openStatusModal(item)}>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title>Order #{item.id}</Title>
-          <Paragraph>Table ID: {item.tableDataId}</Paragraph>
-          <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
-          <Paragraph>Status: {item.status}</Paragraph>
-          <Paragraph>Staff ID: {item.staffId}</Paragraph>
-          <Paragraph>Ordered Items:</Paragraph>
-          {groupItems(item.itemIds).map((groupedItem, index) => (
-            <Text key={index} style={styles.itemText}>{groupedItem}</Text>
-          ))}
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
+    <View style={styles.swipeableOuterContainer}>
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        renderLeftActions={() => renderLeftActions(item)}
+        onSwipeableRightOpen={() => {
+          if (item.status !== 'COMPLETED') {
+            const nextStatus = getNextStatus(item.status);
+            handleStatusChange(item, nextStatus);
+          }
+        }}
+        onSwipeableLeftOpen={() => {
+          if (item.status !== 'COMPLETED') {
+            Alert.alert(
+              'Cancel Order',
+              'Are you sure you want to cancel this order?',
+              [
+                { text: 'No', style: 'cancel', onPress: () => {} },
+                { text: 'Yes', onPress: () => handleStatusChange(item, 'CANCELLED') }
+              ]
+            );
+          }
+        }}
+        friction={2}
+        rightThreshold={40}
+        leftThreshold={40}
+      >
+        <TouchableOpacity 
+          onPress={() => {
+            setSelectedOrder(item);
+            setModalVisible(true);
+          }}
+          activeOpacity={0.9}
+        >
+          <Card style={[styles.card, { backgroundColor: getCardBackground(item.status) }]}>
+            <Card.Content>
+              <Title>Order #{item.id}</Title>
+              <Paragraph>Table: {item.tableDataId}</Paragraph>
+              <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
+              <View style={styles.statusRow}>
+                <Text>Status: </Text>
+                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                  {item.status.replace('_', ' ')}
+                </Text>
+              </View>
+              <Paragraph>Items:</Paragraph>
+              {groupItems(item.itemIds).map((item, i) => (
+                <Text key={`${item.id}-${i}`} style={styles.itemText}>
+                  {item.count}x {item.name}
+                </Text>
+              ))}
+            </Card.Content>
+          </Card>
+        </TouchableOpacity>
+      </Swipeable>
+    </View>
   );
 
-  const renderStatusButton = (label) => (
+  const renderStatusFilter = (status) => (
     <TouchableOpacity
-      key={label}
-      style={[styles.filterButton, statusFilter === label && styles.filterButtonActive]}
-      onPress={() => setStatusFilter(label)}
+      key={status}
+      style={[
+        styles.filterButton,
+        statusFilter === status && styles.activeFilterButton
+      ]}
+      onPress={() => setStatusFilter(status)}
     >
-      <Text style={statusFilter === label ? styles.filterTextActive : styles.filterText}>
-        {label.replace('_', ' ')}
+      <Text style={statusFilter === status ? styles.activeFilterText : styles.filterText}>
+        {status.replace('_', ' ')}
       </Text>
     </TouchableOpacity>
   );
@@ -151,9 +476,14 @@ const OrderScreen = () => {
     navigation.navigate('AddOrder');
   };
 
-  if (loading) {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOrders();
+  };
+
+  if (loading && !refreshing) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={styles.loader}>
         <ActivityIndicator size="large" color="#6200ee" />
         <Text style={styles.loaderText}>Loading orders...</Text>
       </View>
@@ -162,39 +492,47 @@ const OrderScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Orders</Text>
+      <Text style={styles.header}>Orders</Text>
 
-      <View style={styles.statusFilterContainer}>
-        {statuses.map(renderStatusButton)}
+      <View style={styles.filterRow}>
+        {statuses.map(renderStatusFilter)}
       </View>
 
-      <View style={styles.toggleContainer}>
-        <Text style={styles.toggleLabel}>Only My Orders</Text>
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleText}>Only My Orders</Text>
         <Switch
           value={onlyMine}
           onValueChange={setOnlyMine}
-          trackColor={{ false: '#ccc', true: '#6200ee' }}
-          thumbColor={onlyMine ? '#fff' : '#f4f3f4'}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={onlyMine ? '#6200ee' : '#f4f3f4'}
         />
       </View>
 
       {error ? (
-        <View style={styles.errorContainer}>
+        <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <Text style={styles.emptyText}>No orders found</Text>
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           renderItem={renderItem}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-          contentContainerStyle={styles.listContainer}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#6200ee']}
+              tintColor={'#6200ee'}
+            />
+          }
         />
       )}
 
-      <TouchableOpacity 
-        style={styles.fab} 
+      <TouchableOpacity
+        style={styles.fab}
         onPress={handleAddOrder}
       >
         <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
@@ -202,34 +540,81 @@ const OrderScreen = () => {
         </View>
       </TouchableOpacity>
 
-      {/* Modal for changing status */}
       <Modal
         transparent
-        animationType="slide"
         visible={modalVisible}
+        animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Change Order Status</Text>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Order #{selectedOrder?.id}</Text>
+            
+            <Text style={styles.sectionTitle}>Change Status:</Text>
             {statuses.map((status) => (
               <Pressable
                 key={status}
-                style={styles.modalButton}
-                onPress={() => changeOrderStatus(status)}
+                style={[styles.modalOption, { 
+                  backgroundColor: getStatusColor(status) 
+                }]}
+                onPress={() => {
+                  handleStatusChange(selectedOrder, status);
+                }}
               >
-                <Text style={styles.modalButtonText}>{status.replace('_', ' ')}</Text>
+                <Text style={styles.modalOptionText}>{status.replace('_', ' ')}</Text>
               </Pressable>
             ))}
+            
+            <Text style={styles.sectionTitle}>Actions:</Text>
             <Pressable
-              style={[styles.modalButton, { backgroundColor: '#ccc' }]}
+              style={[styles.modalOption, { backgroundColor: '#6200ee' }]}
+              onPress={() => {
+                setModalVisible(false);
+                setEditModalVisible(true);
+              }}
+            >
+              <Text style={styles.modalOptionText}>Edit Items</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.modalOption, { backgroundColor: '#d32f2f' }]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Order',
+                  'Are you sure you want to delete this order?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', onPress: handleDeleteOrder }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.modalOptionText}>Delete Order</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.modalOption, { backgroundColor: '#ccc' }]}
               onPress={() => setModalVisible(false)}
             >
-              <Text style={[styles.modalButtonText, { color: 'black' }]}>Cancel</Text>
+              <Text style={[styles.modalOptionText, { color: '#333' }]}>Cancel</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
+      {renderEditModal()}
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={{
+          label: 'Dismiss',
+          onPress: () => setSnackbarVisible(false),
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };
@@ -240,88 +625,98 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  title: {
-    fontSize: 28,
+  header: {
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+    color: '#333',
   },
-  statusFilterContainer: {
+  filterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8, // If your RN version < 0.71, remove gap and rely on margin
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    marginBottom: 12,
   },
   filterButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#ddd',
+    backgroundColor: '#e0e0e0',
     margin: 4,
   },
-  filterButtonActive: {
+  activeFilterButton: {
     backgroundColor: '#6200ee',
   },
   filterText: {
     color: '#333',
-    fontSize: 14,
   },
-  filterTextActive: {
-    color: '#fff',
+  activeFilterText: {
+    color: 'white',
     fontWeight: 'bold',
-    fontSize: 14,
   },
-  toggleContainer: {
+  toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
-  toggleLabel: {
-    fontSize: 16,
+  toggleText: {
     marginRight: 8,
-  },
-  listContainer: {
-    paddingBottom: 20,
+    fontSize: 16,
   },
   card: {
-    marginBottom: 16,
-    elevation: 2,
+    borderRadius: 8,
   },
-  loaderContainer: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statusText: {
+    fontWeight: 'bold',
+  },
+  itemText: {
+    marginLeft: 8,
+    marginBottom: 2,
+  },
+  actionText: {
+    color: 'white',
+    fontWeight: 'bold',
+    padding: 10,
+  },
+  loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loaderText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
   },
-  errorContainer: {
-    padding: 20,
+  errorBox: {
     backgroundColor: '#ffebee',
-    borderRadius: 5,
-    marginBottom: 20,
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   errorText: {
-    color: 'red',
-    fontSize: 16,
+    color: '#d32f2f',
     textAlign: 'center',
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
     color: '#757575',
+    marginTop: 24,
   },
-  itemText: {
-    fontSize: 14,
-    marginLeft: 10,
+  listContent: {
+    paddingBottom: 16,
   },
   fab: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    right: 24,
+    bottom: 24,
     backgroundColor: '#6200ee',
     width: 56,
     height: 56,
@@ -330,36 +725,114 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
   },
-  modalOverlay: {
+  modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
+  modalBox: {
     backgroundColor: 'white',
     borderRadius: 10,
     padding: 20,
-    width: 300,
-    alignItems: 'center',
+    width: '80%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  modalButton: {
+  modalOption: {
     backgroundColor: '#6200ee',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginVertical: 5,
-    width: '100%',
+    padding: 12,
+    borderRadius: 6,
+    marginVertical: 6,
     alignItems: 'center',
   },
-  modalButtonText: {
+  modalOptionText: {
     color: 'white',
+    fontWeight: 'bold',
+  },
+  swipeableContainer: {
+    marginBottom: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  swipeableInnerContainer: {
+    borderRadius: 8,
+  },
+  editModalBox: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  sectionTitle: {
     fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 15,
+    marginBottom: 10,
+    color: '#333',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  itemName: {
+    flex: 1,
+    fontSize: 14,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeButton: {
+    backgroundColor: '#F44336',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  swipeableOuterContainer: {
+    marginBottom: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 'auto',
+  },
+  actionContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    flex: 1,
+  },
+  actionButton: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
