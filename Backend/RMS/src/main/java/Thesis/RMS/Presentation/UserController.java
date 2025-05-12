@@ -10,13 +10,16 @@ import Thesis.RMS.Infrastructure.Security.JwtUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,26 +34,51 @@ public class UserController {
     private final JwtUtils jwtUtils;
     private final StaffUseCases staffUseCases;
 
-    @PostMapping("/register")
+    @PostMapping(value="/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> registerUser(@RequestBody UserDTO userDTO) {
+        if (userDTO.getRole() == null) {
+            return ResponseEntity.badRequest().body("A role must be specified");
+        }
+
+        if (userDTO.getRole().equals("WAITER") || userDTO.getRole().equals("CHEF") || userDTO.getRole().equals("ADMIN")) {
+            if (userDTO.getUsername() == null || userDTO.getUsername().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Username is required for staff roles");
+            }
+        }
+
         return userService.registerUser(userDTO);
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> authenticate(@RequestBody LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword())
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword())
+            );
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String jwt = jwtUtils.generateTokenFromUserDetails(userDetails);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-        Long staffId = staffUseCases.getStaffIdByUsername(userDetails.getUsername());
+            String jwt = jwtUtils.generateTokenFromUserDetails(userDetails);
+            Long staffId = null;
 
-        return ResponseEntity.ok(new LoginResponse(jwt, userDetails.getUsername(), convertAuthorities(userDetails), staffId));
+            try {
+                staffId = staffUseCases.getStaffIdByUsername(userDetails.getUsername());
+            } catch (Exception e) {
+            }
+
+            return ResponseEntity.ok(new LoginResponse(
+                    jwt,
+                    userDetails.getUsername(),
+                    convertAuthorities(userDetails),
+                    staffId
+            ));
+        } catch (AuthenticationException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Invalid username/password", e);
+        }
     }
 
     @PostMapping("/change-password")
@@ -66,10 +94,7 @@ public class UserController {
         return userService.changePassword(username, request);
     }
 
-
-    private List<String> convertAuthorities(UserDetails userDetails) {
-        return userDetails.getAuthorities().stream()
-                .map(auth -> auth.getAuthority().replace("ROLE_", ""))
-                .collect(Collectors.toList());
+    private String convertAuthorities(UserDetails userDetails) {
+        return userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
     }
 }

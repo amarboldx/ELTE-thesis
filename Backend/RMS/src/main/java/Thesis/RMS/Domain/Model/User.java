@@ -1,13 +1,11 @@
 package Thesis.RMS.Domain.Model;
 
+import Thesis.RMS.Domain.Enums.Role;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-
-import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -24,10 +22,9 @@ public class User {
     private String username;
     private String password;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "role")
-    private Set<String> roles;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
 
     @OneToOne(mappedBy = "user")
     private Staff staff;

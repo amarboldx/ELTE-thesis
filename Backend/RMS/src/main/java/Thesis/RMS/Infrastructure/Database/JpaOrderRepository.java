@@ -48,4 +48,5 @@ public interface JpaOrderRepository extends JpaRepository<Order, Long>, OrderRep
     @Query("SELECT o FROM Order o WHERE o.staff.staffId = :staffId AND o.status = :status")
     List<Order> findByStaffIdAndStatus(@NonNull Long staffId, @NonNull OrderStatus status);
 
+
 }

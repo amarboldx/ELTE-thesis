@@ -27,5 +27,9 @@ public interface JpaUserRepository extends UserRepository, JpaRepository<User, L
     @Query("DELETE FROM User u WHERE u.userId = :userId")
     void deleteById(@NonNull Long userId);
 
+    @Override
+    @NonNull
+    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u WHERE u.username = :username")
+    boolean existsByUsername(@NonNull String username);
 
 }

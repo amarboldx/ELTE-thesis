@@ -88,10 +88,18 @@ public class OrderController {
     }
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/remove-item")
-    public ResponseEntity<Void> removeItemFromOrder(@PathVariable Long id, @RequestParam Long itemId) {
-        orderUseCases.removeItemFromOrder(id, itemId);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Void> removeItemFromOrder(
+            @PathVariable Long id,
+            @RequestParam Long itemId
+    ) {
+        try {
+            orderUseCases.removeItemFromOrder(id, itemId);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
+
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelOrder(@PathVariable Long id) {

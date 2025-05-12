@@ -11,6 +11,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -84,10 +86,14 @@ public class OrderUseCases {
 
     public List<OrderDTO> getOrdersByStatusForCurrentStaff(OrderStatus status) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("User not found"));
-        Staff staff = staffRepository.findByUser(user).orElseThrow(() -> new RuntimeException("Staff not found"));
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<Order> orders = orderRepository.findByStaffIdAndStatus(staff.getStaffId(), status);
+        if (user.getStaff() == null) {
+            throw new IllegalStateException("Current user is not associated with staff");
+        }
+
+        List<Order> orders = orderRepository.findByStaffIdAndStatus(user.getStaff().getStaffId(), status);
         return orders.stream().map(this::convertToDTO).toList();
     }
 
@@ -173,9 +179,18 @@ public class OrderUseCases {
     @Transactional
     public void removeItemFromOrder(Long orderId, Long itemId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
 
-        order.getItems().removeIf(item -> item.getId().equals(itemId));
+        Optional<Item> itemToRemove = order.getItems().stream()
+                .filter(item -> item.getId().equals(itemId))
+                .findFirst();
+
+        if (!itemToRemove.isPresent()) {
+            throw new IllegalArgumentException("Item not found in order");
+        }
+
+        order.setItems(new ArrayList<>(order.getItems()));
+        order.getItems().remove(itemToRemove.get());
         orderRepository.save(order);
     }
 
