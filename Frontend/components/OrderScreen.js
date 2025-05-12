@@ -17,7 +17,7 @@ import {
 import { Card, Title, Paragraph, Snackbar } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect  } from '@react-navigation/native';
 import { RectButton, Swipeable } from 'react-native-gesture-handler';
 import api from './config/api';
 
@@ -39,6 +39,7 @@ const OrderScreen = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [staffNames, setStaffNames] = useState({});
 
   const navigation = useNavigation();
 
@@ -52,6 +53,28 @@ const OrderScreen = () => {
       applyFilters();
     }
   }, [statusFilter, onlyMine, allOrders]);
+
+  useEffect(() => {
+    if (token) {
+      fetchOrders(); 
+    }
+  }, [statusFilter, token]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchOrders(); 
+    }, [])
+  );
+
+  useEffect(() => {
+    if (allOrders.length > 0) {
+      allOrders.forEach((order) => {
+        if (order.staffId && !staffNames[order.staffId]) {
+          getStaffName(order.staffId);
+        }
+      });
+    }
+  }, [allOrders]);
 
   const checkToken = async () => {
     try {
@@ -74,14 +97,11 @@ const OrderScreen = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const endpoint = onlyMine
-        ? `/order/staff/status/${statusFilter}`
-        : `/order/status/${statusFilter}`;
-
-      const response = await api.get(endpoint);
+      const response = await api.get(`/order/status/${statusFilter}`);
+      
       const allItemIds = response.data.flatMap(order => order.itemIds || []);
       await fetchItemNames(allItemIds);
-
+  
       const sortedOrders = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
       setAllOrders(sortedOrders);
       setError(null);
@@ -118,16 +138,17 @@ const OrderScreen = () => {
     }
   };
 
-  const applyFilters = () => {
+  const applyFilters = async () => {
+    const currentUserId = await AsyncStorage.getItem('staffId');
     let result = [...allOrders];
     
-    // Apply status filter
     if (statusFilter) {
       result = result.filter(order => order.status === statusFilter);
     }
-    
-    // Here you would apply the "onlyMine" filter if needed
-    // For example: result = result.filter(order => order.staffId === currentUserId);
+  
+    if (onlyMine) {
+      result = result.filter(order => order.staffId == currentUserId);
+    }
     
     setFilteredOrders(result);
   };
@@ -399,6 +420,18 @@ const OrderScreen = () => {
     );
   };
 
+  const getStaffName = async (staffId) => {
+    try {
+      const response = await api.get(`/staff/${staffId}`);
+      setStaffNames((prevNames) => ({
+        ...prevNames,
+        [staffId]: response.data.name,
+      }));
+    } catch (err) {
+      console.error('Error fetching staff name:', err);
+    }
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.swipeableOuterContainer}>
       <Swipeable
@@ -443,6 +476,10 @@ const OrderScreen = () => {
                 <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
                   {item.status.replace('_', ' ')}
                 </Text>
+                
+                <Paragraph style={{ marginLeft: 'auto' }}>
+                  Staff: {staffNames[item.staffId] || 'Loading...'}
+                </Paragraph>
               </View>
               <Paragraph>Items:</Paragraph>
               {groupItems(item.itemIds).map((item, i) => (
@@ -502,7 +539,9 @@ const OrderScreen = () => {
         <Text style={styles.toggleText}>Only My Orders</Text>
         <Switch
           value={onlyMine}
-          onValueChange={setOnlyMine}
+          onValueChange={(value) => {
+            setOnlyMine(value);
+          }}
           trackColor={{ false: '#767577', true: '#81b0ff' }}
           thumbColor={onlyMine ? '#6200ee' : '#f4f3f4'}
         />

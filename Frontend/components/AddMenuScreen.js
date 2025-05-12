@@ -3,7 +3,6 @@ import { View, Text, TextInput, StyleSheet, Alert, ScrollView, TouchableOpacity 
 import { Checkbox, Button } from 'react-native-paper';
 import api from './config/api';
 
-// Allergen options from the enum
 const ALLERGENS = [
   'HALAL',
   'VEGAN',

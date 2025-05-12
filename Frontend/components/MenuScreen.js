@@ -11,7 +11,7 @@ const MenuScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [token, setToken] = useState(null);
-  const [roles, setRoles] = useState([]); 
+  const [role, setRole] = useState(""); 
 
   const navigation = useNavigation();
 
@@ -22,16 +22,16 @@ const MenuScreen = () => {
   const checkToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('jwtToken');
-      const storedRoles = await AsyncStorage.getItem('roles'); 
+      const storedRole = await AsyncStorage.getItem('role'); 
       console.log('Stored Token:', storedToken);
-      console.log('Stored Roles:', storedRoles);
+      console.log('Stored Role:', storedRole);
 
       setToken(storedToken);
-      if (storedRoles) {
-        setRoles(JSON.parse(storedRoles)); // Parse roles from JSON string to array
+      if (storedRole) {
+        setRole(storedRole);
       }
 
-      if (storedToken && storedRoles) {
+      if (storedToken && storedRole) {
         fetchMenuItems();
       } else {
         setError('No authentication token found. Please log in again.');
@@ -112,7 +112,7 @@ const MenuScreen = () => {
           )}
         </View>
 
-        {roles.includes('ADMIN') && (
+        {role== 'ADMIN' && (
           <TouchableOpacity
             style={styles.fab}
             onPress={handleAddItem}

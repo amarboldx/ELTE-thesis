@@ -1,4 +1,3 @@
-// AppNavigator.js
 import React, { useContext, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -12,6 +11,9 @@ import AddReservationScreen from './AddReservationScreen ';
 import AddMenuScreen from './AddMenuScreen';
 import AddShiftScreen from './AddShiftScreen';
 import EditShiftScreen from './EditShiftScreen';
+import RegisterScreen from './RegisterScreen';
+import ShiftsScreen from './ShiftsScreen';
+import OrderScreen from './OrderScreen';
 
 
 const Stack = createStackNavigator();
@@ -52,9 +54,14 @@ const AppNavigator = () => {
                 <Stack.Screen name="AddMenu" component={AddMenuScreen} />
                 <Stack.Screen name="AddShift" component={AddShiftScreen} />
                 <Stack.Screen name="EditShift" component={EditShiftScreen} />
+                <Stack.Screen name="ShiftsScreen" component={ShiftsScreen} />
+                <Stack.Screen name="OrderScreen" component={OrderScreen} />
               </>
             ) : (
+              <>
               <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="Register" component={RegisterScreen} />
+              </>
             )}
           </Stack.Navigator>
 

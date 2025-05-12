@@ -21,8 +21,8 @@ const EditShiftScreen = ({ route, navigation }) => {
     const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(new Date());
     const [showPicker, setShowPicker] = useState(false);
-    const [currentPicker, setCurrentPicker] = useState(null); // 'start' | 'end'
-    const [pickerMode, setPickerMode] = useState('date'); // 'date' or 'time'
+    const [currentPicker, setCurrentPicker] = useState(null);
+    const [pickerMode, setPickerMode] = useState('date');
 
     useEffect(() => {
         fetchShift();
@@ -52,13 +52,11 @@ const EditShiftScreen = ({ route, navigation }) => {
     };
 
     const handleUpdate = async () => {
-        // Ensure startDate is before endDate
         if (!isBefore(startDate, endDate)) {
             Alert.alert('Invalid Time', 'Start time must be before end time');
             return;
         }
 
-        // Ensure shift is at least 1 hour
         if ((endDate.getTime() - startDate.getTime()) < (60 * 60 * 1000)) {
             Alert.alert('Invalid Duration', 'Shift must be at least 1 hour long');
             return;
@@ -67,7 +65,6 @@ const EditShiftScreen = ({ route, navigation }) => {
         try {
             const token = await AsyncStorage.getItem('jwtToken');
             
-            // Use toLocalISOString to ensure we send times in local time zone
             const startTime = toLocalISOString(startDate);
             const endTime = toLocalISOString(endDate);
             
@@ -98,12 +95,10 @@ const EditShiftScreen = ({ route, navigation }) => {
     const handleDateChange = (selectedDate) => {
         if (currentPicker === 'start') {
             setStartDate(selectedDate);
-            // Auto-set end date to 1 hour after start if it's before start
             if (!isBefore(selectedDate, endDate)) {
                 setEndDate(addHours(selectedDate, 1));
             }
         } else {
-            // Ensure end date is at least 1 hour after start
             if (isBefore(selectedDate, addHours(startDate, 1))) {
                 Alert.alert('Invalid Time', 'Shift must be at least 1 hour long');
                 setEndDate(addHours(startDate, 1));
@@ -153,7 +148,6 @@ const EditShiftScreen = ({ route, navigation }) => {
 
         if (selectedDate) {
             if (pickerMode === 'date') {
-                // For date selection, update the date part only
                 const updatedDate = new Date(
                     selectedDate.getFullYear(),
                     selectedDate.getMonth(),
@@ -166,7 +160,6 @@ const EditShiftScreen = ({ route, navigation }) => {
                     setPickerMode('time');
                 }
             } else {
-                // For time selection, update the time part only
                 const updatedDate = new Date(
                     currentPicker === 'start' ? startDate : endDate
                 );

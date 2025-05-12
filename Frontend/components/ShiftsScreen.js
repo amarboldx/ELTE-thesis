@@ -11,6 +11,7 @@ import {
     PanResponder
 } from 'react-native';
 import { Button as PaperButton } from 'react-native-paper';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './config/api';
 import {
@@ -36,7 +37,6 @@ import {
     subMonths
 } from 'date-fns';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
 
 const HOUR_HEIGHT = 60;
 const TOTAL_DAY_HEIGHT = 24 * HOUR_HEIGHT;
@@ -53,7 +53,7 @@ const ShiftsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [token, setToken] = useState(null);
-    const [userRoles, setUserRoles] = useState([]);
+    const [userRole, setUserRole] = useState("WAITER");
     const [showMonthView, setShowMonthView] = useState(false);
     const swipeAnim = useRef(new Animated.Value(0)).current;
     const [selectedWeekday, setSelectedWeekday] = useState(getDay(new Date()));
@@ -180,14 +180,20 @@ const ShiftsScreen = () => {
         checkTokenAndFetchData();
     }, []);
 
-    const isAdmin = userRoles.includes('ADMIN');
+    useFocusEffect(
+        React.useCallback(() => {
+          fetchShiftsAndStaff();
+        }, [])
+      );
+
+    const isAdmin = userRole == 'ADMIN';
 
     const checkTokenAndFetchData = async () => {
         setLoading(true);
         setError(null);
         try {
             const storedToken = await AsyncStorage.getItem('jwtToken');
-            const storedRoles = await AsyncStorage.getItem('roles');
+            const storedRole = await AsyncStorage.getItem('role');
             setToken(storedToken);
             if (storedToken) {
                 await fetchShiftsAndStaff();
@@ -195,8 +201,8 @@ const ShiftsScreen = () => {
                 setError('No authentication token found. Please log in again.');
                 setLoading(false);
             }
-            if (storedRoles) {
-                setUserRoles(JSON.parse(storedRoles));
+            if (storedRole) {
+                setUserRole(storedRole);
             } else {
                 setError('No user roles found. Please log in again.');
                 setLoading(false);

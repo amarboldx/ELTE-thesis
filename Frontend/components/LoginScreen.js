@@ -23,17 +23,18 @@ const LoginScreen = ({ navigation }) => {
                 password,
             });
 
-            const { token, username: user, roles, staffId  } = response.data;
+            const { token, username: user, role, staffId  } = response.data;
 
             if (token) {
                 await AsyncStorage.setItem('jwtToken', token);
                 await AsyncStorage.setItem('username', user);
-                await AsyncStorage.setItem('roles', JSON.stringify(roles));
+                await AsyncStorage.setItem('role', role);
                 await AsyncStorage.setItem('staffId', String(staffId));
+                
 
                 console.log('JWT Token:', token);
                 console.log('Username:', user);
-                console.log('Roles:', roles);
+                console.log('Role:', role);
 
                 setIsLoggedIn(true);
             }
@@ -76,6 +77,14 @@ const LoginScreen = ({ navigation }) => {
             >
                 Login
             </Button>
+
+            <Button
+                mode="outlined"
+                onPress={() => navigation.navigate('Register')}
+                style={styles.registerButton}
+            >
+                Register
+            </Button>
         </View>
     );
 };
@@ -103,6 +112,9 @@ const styles = StyleSheet.create({
         color: 'red',
         textAlign: 'center',
         marginTop: 8,
+    },
+    registerButton: {
+        marginTop: 12,
     },
 });
 

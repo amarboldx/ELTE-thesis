@@ -32,7 +32,6 @@ import { GestureHandlerRootView, Swipeable, LongPressGestureHandler, State, Scro
 import api from './config/api';
 
 const AddOrderScreen = ({ navigation }) => {
-  // State variables
   const [tables, setTables] = useState([]);
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
@@ -46,12 +45,10 @@ const AddOrderScreen = ({ navigation }) => {
   const [errorSnackbarVisible, setErrorSnackbarVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Responsive design
   const windowDimensions = useWindowDimensions();
   const isTablet = windowDimensions.width >= 768;
   const numColumns = isTablet ? 2 : 1;
   
-  // Refs for swipeable rows
   const swipeableRefs = useRef({});
   const insets = useSafeAreaInsets();
   
@@ -61,7 +58,6 @@ const AddOrderScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    // Filter items based on search query
     if (searchQuery.trim() === '') {
       setFilteredItems(items);
     } else {
@@ -72,7 +68,6 @@ const AddOrderScreen = ({ navigation }) => {
     }
   }, [searchQuery, items]);
 
-  // Compute selected items for separate section
   const getSelectedItemsArray = () => {
     return Object.keys(selectedItems).map(id => {
       const item = items.find(i => i.id === Number(id));
@@ -83,12 +78,10 @@ const AddOrderScreen = ({ navigation }) => {
     });
   };
 
-  // Prepare sections for SectionList
   const getSections = () => {
     const selectedItemsArray = getSelectedItemsArray();
     const sections = [];
     
-    // Add selected items section if there are any
     if (selectedItemsArray.length > 0) {
       sections.push({
         title: 'Selected Items',
@@ -99,7 +92,6 @@ const AddOrderScreen = ({ navigation }) => {
       });
     }
     
-    // Add menu items section
     sections.push({
       title: 'Menu Items',
       data: filteredItems,

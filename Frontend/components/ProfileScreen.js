@@ -3,12 +3,12 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Button } from 'react-native-paper';
 
 
-const ProfileScreen = ({ username, roles, onLogout }) => {
+const ProfileScreen = ({ username, role, onLogout }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.welcome}>Welcome, {username}</Text>
-      <Text style={styles.roles}>Roles: {roles.join(', ')}</Text>
+      <Text style={styles.roles}>Role: {role}</Text>
       <Button
         mode="contained"
         onPress={onLogout}

@@ -14,7 +14,7 @@ import ProfileScreen from './ProfileScreen';
 const HomeScreen = ({ navigation }) => { 
   const { setIsLoggedIn } = useContext(AuthContext);
   const [username, setUsername] = useState('');
-  const [roles, setRoles] = useState([]);
+  const [role, setRole] = useState("WAITER");
   const [index, setIndex] = useState(0);
 
   const isIOS = Platform.OS === 'ios';
@@ -24,9 +24,9 @@ const HomeScreen = ({ navigation }) => {
     const getUserInfo = async () => {
       try {
         const user = await AsyncStorage.getItem('username');
-        const rolesString = await AsyncStorage.getItem('roles');
+        const roleString = await AsyncStorage.getItem('role');
         setUsername(user || 'Guest');
-        setRoles(JSON.parse(rolesString || '[]'));
+        setRole(roleString || '[]');
       } catch (error) {
         console.error('Error fetching user info:', error);
       }
@@ -63,7 +63,7 @@ const HomeScreen = ({ navigation }) => {
     profile: () => (
       <ProfileScreen
         username={username}
-        roles={roles}
+        role={role}
         onLogout={handleLogout} 
       />
     ),
