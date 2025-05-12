@@ -36,6 +36,7 @@ const ReservationsScreen = () => {
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [role, setRole] = useState("");
 
   const navigation = useNavigation();
 
@@ -52,7 +53,9 @@ const ReservationsScreen = () => {
   const checkToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('jwtToken');
+      const storedRole = await AsyncStorage.getItem('role');
       setToken(storedToken);
+      setRole(storedRole || '');
 
       if (storedToken) {
         fetchReservations();
@@ -323,10 +326,11 @@ const ReservationsScreen = () => {
           }
         />
       )}
-
+      {(role === 'ADMIN' || role === 'WAITER') && (
       <TouchableOpacity style={styles.fab} onPress={handleAddReservation}>
         <MaterialCommunityIcons name="plus" size={24} color="white" />
       </TouchableOpacity>
+      )}
 
       <Modal
         transparent

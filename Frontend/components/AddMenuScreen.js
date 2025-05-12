@@ -36,6 +36,8 @@ const AddMenuScreen = ({ navigation }) => {
       return;
     }
 
+    
+
     const createItemRequest = {
       name,
       description,

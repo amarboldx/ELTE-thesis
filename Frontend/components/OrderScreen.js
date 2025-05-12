@@ -40,6 +40,7 @@ const OrderScreen = () => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [staffNames, setStaffNames] = useState({});
+  const [role, setRole] = useState("");
 
   const navigation = useNavigation();
 
@@ -79,7 +80,9 @@ const OrderScreen = () => {
   const checkToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('jwtToken');
+      const storedRole = await AsyncStorage.getItem('role');
       setToken(storedToken);
+      setRole(storedRole || '');
 
       if (storedToken) {
         fetchOrders();
@@ -569,7 +572,7 @@ const OrderScreen = () => {
           }
         />
       )}
-
+      {(role === 'ADMIN' || role === 'WAITER') && (
       <TouchableOpacity
         style={styles.fab}
         onPress={handleAddOrder}
@@ -578,6 +581,7 @@ const OrderScreen = () => {
           <MaterialCommunityIcons name="plus" size={24} color="white" />
         </View>
       </TouchableOpacity>
+      )}
 
       <Modal
         transparent

@@ -28,7 +28,7 @@ import {
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GestureHandlerRootView, Swipeable, LongPressGestureHandler, State, ScrollView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable, LongPressGestureHandler, State, ScrollView, RectButton } from 'react-native-gesture-handler';
 import api from './config/api';
 
 const AddOrderScreen = ({ navigation }) => {
@@ -76,6 +76,37 @@ const AddOrderScreen = ({ navigation }) => {
         quantity: selectedItems[id]
       };
     });
+  };
+
+  const renderSelectedItem = ({ item }) => {
+    return (
+      <View style={[
+        numColumns > 1 ? { width: windowDimensions.width / numColumns - 24 } : { width: '100%' },
+        { margin: 4 }
+      ]}>
+        <Card style={styles.selectedItemCard}>
+          <Card.Title
+            title={item.name}
+            subtitle={`€${item.price}`}
+            right={() => (
+              <View style={styles.quantityActions}>
+                <Button 
+                  mode="text" 
+                  onPress={() => changeItemQuantity(item.id, -1)}
+                  compact
+                >-</Button>
+                <Text style={styles.quantityText}>{item.quantity}</Text>
+                <Button 
+                  mode="text" 
+                  onPress={() => changeItemQuantity(item.id, 1)}
+                  compact
+                >+</Button>
+              </View>
+            )}
+          />
+        </Card>
+      </View>
+    );
   };
 
   const getSections = () => {
@@ -148,6 +179,9 @@ const AddOrderScreen = ({ navigation }) => {
   };
 
   const toggleItemSelection = (itemId) => {
+    const item = items.find(i => i.id === Number(itemId));
+    if (!item?.available) return;
+    
     setSelectedItems((prev) => {
       const currentQty = prev[itemId] || 0;
       if (currentQty === 0) {
@@ -161,6 +195,9 @@ const AddOrderScreen = ({ navigation }) => {
   };
 
   const changeItemQuantity = (itemId, delta) => {
+    const item = items.find(i => i.id === Number(itemId));
+    if (delta > 0 && !item?.available) return;
+    
     setSelectedItems((prev) => {
       const currentQty = prev[itemId] || 0;
       const newQty = Math.max(0, currentQty + delta);
@@ -182,129 +219,118 @@ const AddOrderScreen = ({ navigation }) => {
 
   const renderRightActions = (itemId) => {
     return (
-      <View style={styles.swipeActions}>
-        <TouchableOpacity 
-          style={[styles.swipeAction, styles.swipeActionAdd]}
-          onPress={() => changeItemQuantity(itemId, 1)}
-        >
-          <Text style={styles.swipeActionText}>Add</Text>
-        </TouchableOpacity>
-      </View>
+      <RectButton
+        style={[styles.actionContainer, styles.swipeActionAdd]}
+        onPress={() => changeItemQuantity(itemId, 1)}
+      >
+        <Text style={styles.actionText}>Add</Text>
+      </RectButton>
     );
   };
-
+  
   const renderLeftActions = (itemId) => {
     return (
-      <View style={styles.swipeActions}>
-        <TouchableOpacity 
-          style={[styles.swipeAction, styles.swipeActionRemove]}
-          onPress={() => changeItemQuantity(itemId, -1)}
-        >
-          <Text style={styles.swipeActionText}>Remove</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderSelectedItem = ({ item, index, section }) => {
-    return (
-      <View style={[
-        numColumns > 1 ? { width: windowDimensions.width / numColumns - 24 } : { width: '100%' },
-        { margin: 4 }
-      ]}>
-        <Card style={styles.selectedItemCard}>
-          <Card.Title
-            title={item.name}
-            subtitle={`€${item.price}`}
-            right={() => (
-              <View style={styles.quantityActions}>
-                <Button 
-                  mode="text" 
-                  onPress={() => changeItemQuantity(item.id, -1)}
-                  compact
-                >-</Button>
-                <Text style={styles.quantityText}>{item.quantity}</Text>
-                <Button 
-                  mode="text" 
-                  onPress={() => changeItemQuantity(item.id, 1)}
-                  compact
-                >+</Button>
-              </View>
-            )}
-          />
-        </Card>
-      </View>
+      <RectButton
+        style={[styles.actionContainer, styles.swipeActionRemove]}
+        onPress={() => changeItemQuantity(itemId, -1)}
+      >
+        <Text style={styles.actionText}>Remove</Text>
+      </RectButton>
     );
   };
 
   const renderMenuItem = ({ item }) => {
     const isSelected = selectedItems[item.id] > 0;
+    const isAvailable = item.available;
+    
     return (
       <View style={[
         numColumns > 1 ? { width: windowDimensions.width / numColumns - 24 } : { width: '100%' },
         { margin: 4 }
       ]}>
-        <Swipeable
-          ref={ref => swipeableRefs.current[item.id] = ref}
-          renderRightActions={() => renderRightActions(item.id)}
-          renderLeftActions={isSelected ? () => renderLeftActions(item.id) : null}
-          onSwipeableOpen={(direction) => {
-            if (direction === 'right') {
-              changeItemQuantity(item.id, 1);
-            } else if (direction === 'left' && isSelected) {
-              changeItemQuantity(item.id, -1);
-            }
-            // Close the swipeable after action
-            setTimeout(() => {
-              if (swipeableRefs.current[item.id]) {
-                swipeableRefs.current[item.id].close();
+        {isAvailable ? (
+          <Swipeable
+            ref={ref => swipeableRefs.current[item.id] = ref}
+            renderRightActions={() => renderRightActions(item.id)}
+            renderLeftActions={isSelected ? () => renderLeftActions(item.id) : null}
+            onSwipeableOpen={(direction) => {
+              if (direction === 'right') {
+                changeItemQuantity(item.id, 1);
+              } else if (direction === 'left' && isSelected) {
+                changeItemQuantity(item.id, -1);
               }
-            }, 300);
-          }}
-        >
-          <LongPressGestureHandler
-            onHandlerStateChange={({ nativeEvent }) => {
-              if (nativeEvent.state === State.ACTIVE) {
-                handleLongPress(item);
-              }
+              setTimeout(() => {
+                if (swipeableRefs.current[item.id]) {
+                  swipeableRefs.current[item.id].close();
+                }
+              }, 300);
             }}
-            minDurationMs={800}
+            friction={2}
+            rightThreshold={40}
+            leftThreshold={40}
+            containerStyle={styles.swipeableContainer}
           >
-            <Card 
-              style={[
-                styles.itemCard,
-                isSelected && styles.itemCardSelected
-              ]}
+            <LongPressGestureHandler
+              onHandlerStateChange={({ nativeEvent }) => {
+                if (nativeEvent.state === State.ACTIVE) {
+                  handleLongPress(item);
+                }
+              }}
+              minDurationMs={800}
             >
-              <TouchableOpacity onPress={() => toggleItemSelection(item.id)}>
-                <Card.Title 
-                  title={item.name} 
-                  subtitle={`€${item.price}`} 
-                  right={() => isSelected ? (
-                    <View style={styles.quantityBadge}>
-                      <Text style={styles.quantityBadgeText}>{selectedItems[item.id]}</Text>
+              <View style={styles.swipeableChildContainer}>
+                <Card 
+                  style={[
+                    styles.itemCard,
+                    isSelected && styles.itemCardSelected
+                  ]}
+                >
+                  <TouchableOpacity onPress={() => toggleItemSelection(item.id)}>
+                    <Card.Title 
+                      title={item.name} 
+                      subtitle={`€${item.price}`} 
+                      right={() => isSelected ? (
+                        <View style={styles.quantityBadge}>
+                          <Text style={styles.quantityBadgeText}>{selectedItems[item.id]}</Text>
+                        </View>
+                      ) : null}
+                    />
+                  </TouchableOpacity>
+                  {isSelected && (
+                    <View style={styles.quantityRow}>
+                      <Button 
+                        mode="outlined" 
+                        onPress={() => changeItemQuantity(item.id, -1)}
+                        compact
+                      >-</Button>
+                      <Text style={styles.quantityText}>{selectedItems[item.id]}</Text>
+                      <Button 
+                        mode="outlined" 
+                        onPress={() => changeItemQuantity(item.id, 1)}
+                        compact
+                      >+</Button>
                     </View>
-                  ) : null}
-                />
-              </TouchableOpacity>
-              {isSelected && (
-                <View style={styles.quantityRow}>
-                  <Button 
-                    mode="outlined" 
-                    onPress={() => changeItemQuantity(item.id, -1)}
-                    compact
-                  >-</Button>
-                  <Text style={styles.quantityText}>{selectedItems[item.id]}</Text>
-                  <Button 
-                    mode="outlined" 
-                    onPress={() => changeItemQuantity(item.id, 1)}
-                    compact
-                  >+</Button>
-                </View>
-              )}
+                  )}
+                </Card>
+              </View>
+            </LongPressGestureHandler>
+          </Swipeable>
+        ) : (
+          <View style={styles.unavailableContainer}>
+            <Card style={[styles.itemCard, styles.unavailableCard]}>
+              <Card.Title 
+                title={item.name} 
+                subtitle={`€${item.price}`} 
+                right={() => (
+                  <View style={styles.unavailableBadge}>
+                    <Text style={styles.unavailableBadgeText}>Unavailable</Text>
+                  </View>
+                )}
+              />
             </Card>
-          </LongPressGestureHandler>
-        </Swipeable>
+            <View style={styles.unavailableOverlay} />
+          </View>
+        )}
       </View>
     );
   };
@@ -417,12 +443,20 @@ const AddOrderScreen = ({ navigation }) => {
                 <Button 
                   mode="contained" 
                   onPress={() => {
-                    toggleItemSelection(currentItemDetails.id);
+                    if (currentItemDetails.available) {
+                      toggleItemSelection(currentItemDetails.id);
+                    }
                     setItemDetailsVisible(false);
                   }}
                   style={styles.modalButton}
+                  disabled={!currentItemDetails.available}
                 >
-                  {selectedItems[currentItemDetails.id] ? 'Remove from Order' : 'Add to Order'}
+                  {!currentItemDetails.available 
+                    ? 'Unavailable' 
+                    : selectedItems[currentItemDetails.id] 
+                      ? 'Remove from Order' 
+                      : 'Add to Order'
+                  }
                 </Button>
               </View>
             )}
@@ -589,7 +623,8 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     marginBottom: 10,
-    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   itemCardSelected: {
     backgroundColor: '#f0e6ff',
@@ -642,7 +677,6 @@ const styles = StyleSheet.create({
   },
   swipeActions: {
     width: 80,
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -654,9 +688,11 @@ const styles = StyleSheet.create({
   },
   swipeActionAdd: {
     backgroundColor: '#4CAF50',
+    marginBottom: 10,
   },
   swipeActionRemove: {
     backgroundColor: '#F44336',
+    marginBottom: 10,
   },
   swipeActionText: {
     color: 'white',
@@ -695,6 +731,58 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
+  unavailableContainer: {
+    position: 'relative',
+  },
+  unavailableCard: {
+    opacity: 0.7,
+  },
+  unavailableOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(200, 200, 200, 0.5)',
+    borderRadius: 8,
+  },
+  unavailableBadge: {
+    backgroundColor: '#f44336',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 16,
+  },
+  unavailableBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  swipeableContainer: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  swipeableChildContainer: {
+    flex: 1,
+  },
+  swipeableOuterContainer: {
+    marginBottom: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  actionContainer: {
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  actionText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
 });
 
 export default AddOrderScreen;
