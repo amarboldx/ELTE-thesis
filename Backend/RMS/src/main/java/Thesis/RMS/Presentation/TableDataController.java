@@ -52,6 +52,32 @@ public class TableDataController {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PutMapping("/{tableId}")
+    public ResponseEntity<TableDataDTO> updateTable(@PathVariable Long tableId, @RequestBody TableDataDTO tableDataDTO) {
+        TableData tableData = new TableData();
+
+        tableData.setTableNumber(tableDataDTO.getTableNumber());
+        tableData.setTableStatus(tableDataDTO.getTableStatus());
+        tableData.setOrderStatus(tableDataDTO.getOrderStatus());
+        tableData.setShape(TableShape.valueOf(tableDataDTO.getShape()));
+        tableData.setX(tableDataDTO.getX());
+        tableData.setY(tableDataDTO.getY());
+        tableData.setWidth(tableDataDTO.getWidth());
+        tableData.setHeight(tableDataDTO.getHeight());
+        tableData.setRadius(tableDataDTO.getRadius());
+        tableData.setFloor(tableDataDTO.getFloor());
+
+        TableDataDTO updatedTable = tableDataUseCases.updateTable(tableId, tableData);
+        if (updatedTable == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(updatedTable);
+    }
+
+
+    @Transactional
     @GetMapping("/{tableId}")
     public ResponseEntity<TableDataDTO> getTableById(@PathVariable Long tableId) {
         TableDataDTO table = tableDataUseCases.getTableById(tableId);

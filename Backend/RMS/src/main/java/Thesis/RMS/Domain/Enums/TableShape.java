@@ -4,5 +4,4 @@ public enum TableShape {
     SQUARE,
     RECTANGLE,
     CIRCLE,
-    OVAL
 }

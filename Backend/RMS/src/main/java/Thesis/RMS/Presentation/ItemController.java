@@ -76,7 +76,7 @@ public class ItemController {
         itemUseCases.deleteItem(id);
         return ResponseEntity.noContent().build();
     }
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/availability")
     public ResponseEntity<Void> updateItemAvailability(@PathVariable Long id, @RequestParam boolean available) {
         itemUseCases.updateItemAvailability(id, available);

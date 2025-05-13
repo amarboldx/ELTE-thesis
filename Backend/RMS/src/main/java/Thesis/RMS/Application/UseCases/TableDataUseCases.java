@@ -156,6 +156,26 @@ public class TableDataUseCases {
         }
     }
 
+    public TableDataDTO updateTable(Long tableId, TableData tableData) {
+        TableData existingTable = tableDataRepository.findById(tableId).orElse(null);
+        if (existingTable != null) {
+            existingTable.setTableNumber(tableData.getTableNumber());
+            existingTable.setOrderStatus(tableData.getOrderStatus());
+            existingTable.setTableStatus(tableData.getTableStatus());
+            existingTable.setAssignedStaff(tableData.getAssignedStaff());
+            existingTable.setShape(tableData.getShape());
+            existingTable.setX(tableData.getX());
+            existingTable.setY(tableData.getY());
+            existingTable.setWidth(tableData.getWidth());
+            existingTable.setHeight(tableData.getHeight());
+            existingTable.setRadius(tableData.getRadius());
+            existingTable.setFloor(tableData.getFloor());
+
+            tableDataRepository.save(existingTable);
+        }
+        return toTableDataDTO(existingTable);
+    }
+
     private TableDataDTO toTableDataDTO(TableData tableData) {
         TableDataDTO tableDataDTO = new TableDataDTO();
         tableDataDTO.setId(tableData.getId());
