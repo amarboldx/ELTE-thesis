@@ -333,6 +333,7 @@ const TableScreen = ({navigation}) => {
     setFloorInputModalVisible(false);
     setIsPlacing(true);
   };
+  
 
   const renderGridLines = () => {
     const verticalLines = [];
@@ -593,7 +594,7 @@ const TableScreen = ({navigation}) => {
   };
 
   const getTableColor = table => {
-    if (table.orderStatus === 'IN_PROGRESS') return '#FF9800';
+    if (table.tableStatus === 'AVAILABLE') return '#4CAF50';
     if (table.tableStatus === 'OCCUPIED') return '#F44336';
     if (table.tableStatus === 'RESERVED') return '#2196F3';
     return '#4CAF50';
@@ -616,16 +617,12 @@ const TableScreen = ({navigation}) => {
         `Table ${table.tableNumber}`,
         `Status: ${table.tableStatus}\nOrder Status: ${table.orderStatus}`,
         [
-          {text: 'View Orders', onPress: () => viewTableOrders(table)},
           {text: 'Cancel', style: 'cancel'},
         ],
       );
     }
   };
 
-  const viewTableOrders = table => {
-    navigation.navigate('OrderScreen', {tableId: table.id});
-  };
 
   const validateInput = () => {
     let isValid = true;
