@@ -163,23 +163,53 @@ public class OrderUseCases {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
 
-        order.getItems().add(itemRepository.findById(itemId)
-                .orElseThrow(() -> new IllegalArgumentException("Item with ID " + itemId + " not found.")));
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot add items to a completed order.");
+        }
 
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Item with ID " + itemId + " not found."));
+
+        order.getItems().add(item);
         orderRepository.save(order);
     }
 
     public void updateOrderStatus(Long orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
+
         order.setStatus(status);
         orderRepository.save(order);
+
+        TableData table = order.getTableData();
+
+        if (status == OrderStatus.IN_PROGRESS || status == OrderStatus.PENDING) {
+            table.setTableStatus(TableStatus.OCCUPIED);
+            tableDataRepository.save(table);
+            return;
+        }
+
+        List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
+
+        boolean allComplete = tableOrders.stream()
+                .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
+
+        if (allComplete) {
+            table.setTableStatus(TableStatus.AVAILABLE);
+            tableDataRepository.save(table);
+        }
     }
+
+
 
     @Transactional
     public void removeItemFromOrder(Long orderId, Long itemId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot remove items from a completed order.");
+        }
 
         Optional<Item> itemToRemove = order.getItems().stream()
                 .filter(item -> item.getId().equals(itemId))
@@ -191,13 +221,27 @@ public class OrderUseCases {
 
         order.setItems(new ArrayList<>(order.getItems()));
         order.getItems().remove(itemToRemove.get());
+
         orderRepository.save(order);
     }
 
+
+    @Transactional
     public void cancelOrder(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
+
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+        TableData table = order.getTableData();
+        List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
+        boolean allComplete = tableOrders.stream()
+                .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
+
+        if (allComplete) {
+            table.setTableStatus(TableStatus.AVAILABLE);
+            tableDataRepository.save(table);
+        }
     }
+
 }

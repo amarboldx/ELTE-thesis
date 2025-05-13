@@ -3,6 +3,7 @@ package Thesis.RMS.Application.UseCases;
 import Thesis.RMS.Application.DTO.ReservationDTO;
 import Thesis.RMS.Application.DTO.ReservationResponseDTO;
 import Thesis.RMS.Domain.Enums.ReservationStatus;
+import Thesis.RMS.Domain.Enums.TableStatus;
 import Thesis.RMS.Domain.Model.Reservation;
 import Thesis.RMS.Domain.Model.TableData;
 import Thesis.RMS.Domain.Repository.ReservationRepository;
@@ -95,9 +96,19 @@ public class ReservationUseCases {
     public void updateReservationStatus(Long id, ReservationStatus status) {
         reservationRepository.findById(id).ifPresent(reservation -> {
             reservation.setStatus(status);
+
+            if (status == ReservationStatus.CONFIRMED) {
+                TableData table = reservation.getTableData();
+                if (table != null) {
+                    table.setTableStatus(TableStatus.RESERVED);
+                    tableDataRepository.save(table);
+                }
+            }
+
             reservationRepository.save(reservation);
         });
     }
+
 
     private ReservationResponseDTO toReservationResponseDTO(Reservation reservation) {
         ReservationResponseDTO responseDTO = new ReservationResponseDTO();
