@@ -10,6 +10,7 @@ import ReservationsScreen from './ReservationsScreen';
 import MenuScreen from './MenuScreen';
 import ShiftsScreen from './ShiftsScreen';
 import ProfileScreen from './ProfileScreen';
+import TableScreen from './TableScreen';
 
 const HomeScreen = ({ navigation }) => { 
   const { setIsLoggedIn } = useContext(AuthContext);
@@ -52,7 +53,9 @@ const HomeScreen = ({ navigation }) => {
     { key: 'reservations', title: 'Reservations', icon: 'calendar-outline' },
     { key: 'menu', title: 'Menu', icon: 'food-outline' },
     { key: 'shifts', title: 'Shifts', icon: 'clock-outline' },
+    { key: 'tables', title: 'Tables', icon: 'table-chair' },
     { key: 'profile', title: 'Profile', icon: 'account-outline' },
+    
   ]);
 
   const renderScene = BottomNavigation.SceneMap({
@@ -60,6 +63,7 @@ const HomeScreen = ({ navigation }) => {
     reservations: () => <ReservationsScreen />,
     menu: () => <MenuScreen />,
     shifts: () => <ShiftsScreen />,
+    tables: () => <TableScreen />,
     profile: () => (
       <ProfileScreen
         username={username}

@@ -14,6 +14,7 @@ import EditShiftScreen from './EditShiftScreen';
 import RegisterScreen from './RegisterScreen';
 import ShiftsScreen from './ShiftsScreen';
 import OrderScreen from './OrderScreen';
+import TableScreen from './TableScreen';
 
 
 const Stack = createStackNavigator();
@@ -56,6 +57,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="EditShift" component={EditShiftScreen} />
                 <Stack.Screen name="ShiftsScreen" component={ShiftsScreen} />
                 <Stack.Screen name="OrderScreen" component={OrderScreen} />
+                <Stack.Screen name="TableScreen" component={TableScreen} />
               </>
             ) : (
               <>

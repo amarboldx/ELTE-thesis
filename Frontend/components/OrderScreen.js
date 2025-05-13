@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect  } from '@react-navigation/native';
 import { RectButton, Swipeable } from 'react-native-gesture-handler';
 import api from './config/api';
+import { set } from 'date-fns';
 
 const statuses = ['IN_PROGRESS', 'PENDING', 'COMPLETED', 'CANCELLED'];
 
@@ -40,6 +41,7 @@ const OrderScreen = () => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [staffNames, setStaffNames] = useState({});
+  const [tableIds, setTableIds] = useState({});
   const [role, setRole] = useState("");
 
   const navigation = useNavigation();
@@ -73,6 +75,9 @@ const OrderScreen = () => {
         if (order.staffId && !staffNames[order.staffId]) {
           getStaffName(order.staffId);
         }
+        if (order.tableDataId && !tableIds[order.tableDataId]) {
+          getTableNumber(order.tableDataId);
+        }        
       });
     }
   }, [allOrders]);
@@ -435,6 +440,19 @@ const OrderScreen = () => {
     }
   };
 
+  const getTableNumber = async (tableId) => {
+    try {
+      const response = await api.get(`/table/${tableId}`);
+      console.log(response.data)
+      setTableIds((prevIds) => ({
+        ...prevIds,
+        [tableId]: response.data.tableNumber,
+      }));
+    } catch (err) {
+      console.error('Error fetching table number:', err);
+    }
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.swipeableOuterContainer}>
       <Swipeable
@@ -472,7 +490,7 @@ const OrderScreen = () => {
           <Card style={[styles.card, { backgroundColor: getCardBackground(item.status) }]}>
             <Card.Content>
               <Title>Order #{item.id}</Title>
-              <Paragraph>Table: {item.tableDataId}</Paragraph>
+              <Paragraph>Table: {tableIds[item.tableDataId] || 'Loading...'}</Paragraph>
               <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
               <View style={styles.statusRow}>
                 <Text>Status: </Text>
