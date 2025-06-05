@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  ActivityIndicator, 
-  TouchableOpacity, 
-  Switch, 
-  Modal, 
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  Switch,
+  Modal,
   Pressable,
   Alert,
-  ToastAndroid,
   Platform,
-  RefreshControl
+  RefreshControl,
 } from 'react-native';
-import { Card, Title, Paragraph, Snackbar } from 'react-native-paper';
+import {Card, Title, Paragraph, Snackbar} from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect  } from '@react-navigation/native';
-import { RectButton, Swipeable } from 'react-native-gesture-handler';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {RectButton, Swipeable} from 'react-native-gesture-handler';
 import api from './config/api';
-import { set } from 'date-fns';
+import NotificationService from './NotificationService';
 
 const statuses = ['IN_PROGRESS', 'PENDING', 'COMPLETED', 'CANCELLED'];
 
@@ -42,7 +41,7 @@ const OrderScreen = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [staffNames, setStaffNames] = useState({});
   const [tableIds, setTableIds] = useState({});
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState('');
 
   const navigation = useNavigation();
 
@@ -59,28 +58,61 @@ const OrderScreen = () => {
 
   useEffect(() => {
     if (token) {
-      fetchOrders(); 
+      fetchOrders();
     }
   }, [statusFilter, token]);
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchOrders(); 
+      fetchOrders();
+    }, []),
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      NotificationService.setCurrentScreen('orders');
+      NotificationService.resetUnreadCount();
+
+      const unsubscribe = NotificationService.addListener(event => {
+
+        
+        switch (event.eventType) {
+          case 'created':
+            setAllOrders(prev => [event.order, ...prev]);
+            break;
+          case 'status-updated':
+            setAllOrders(prev =>
+              prev.map(o => (o.id === event.order.id ? event.order : o))
+            );
+            break;
+          case 'deleted':
+            setAllOrders(prev => prev.filter(o => o.id !== event.order.id));
+            break;
+        }
+      });
+
+      return () => {
+        NotificationService.setCurrentScreen(null);
+        unsubscribe();
+      };
     }, [])
   );
 
+
+
   useEffect(() => {
     if (allOrders.length > 0) {
-      allOrders.forEach((order) => {
+      allOrders.forEach(order => {
         if (order.staffId && !staffNames[order.staffId]) {
           getStaffName(order.staffId);
         }
         if (order.tableDataId && !tableIds[order.tableDataId]) {
           getTableNumber(order.tableDataId);
-        }        
+        }
       });
     }
   }, [allOrders]);
+
 
   const checkToken = async () => {
     try {
@@ -106,16 +138,22 @@ const OrderScreen = () => {
     try {
       setLoading(true);
       const response = await api.get(`/order/status/${statusFilter}`);
-      
+
       const allItemIds = response.data.flatMap(order => order.itemIds || []);
       await fetchItemNames(allItemIds);
-  
-      const sortedOrders = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const sortedOrders = response.data.sort(
+        (a, b) => new Date(b.date) - new Date(a.date),
+      );
       setAllOrders(sortedOrders);
       setError(null);
     } catch (err) {
       console.error('Error fetching orders:', err);
-      setError(err.response ? `Failed to load orders. Server returned ${err.response.status}` : 'An error occurred while fetching orders');
+      setError(
+        err.response
+          ? `Failed to load orders. Server returned ${err.response.status}`
+          : 'An error occurred while fetching orders',
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -131,7 +169,7 @@ const OrderScreen = () => {
     }
   };
 
-  const fetchItemNames = async (itemIds) => {
+  const fetchItemNames = async itemIds => {
     try {
       if (itemIds.length === 0) return;
 
@@ -149,19 +187,19 @@ const OrderScreen = () => {
   const applyFilters = async () => {
     const currentUserId = await AsyncStorage.getItem('staffId');
     let result = [...allOrders];
-    
+
     if (statusFilter) {
       result = result.filter(order => order.status === statusFilter);
     }
-  
+
     if (onlyMine) {
       result = result.filter(order => order.staffId == currentUserId);
     }
-    
+
     setFilteredOrders(result);
   };
 
-  const groupItems = (itemIds) => {
+  const groupItems = itemIds => {
     const itemCounts = {};
     (itemIds || []).forEach(id => {
       itemCounts[id] = (itemCounts[id] || 0) + 1;
@@ -169,57 +207,65 @@ const OrderScreen = () => {
     return Object.entries(itemCounts).map(([id, count]) => ({
       id,
       name: itemMap[id] || `Item ID: ${id}`,
-      count
+      count,
     }));
   };
 
-  const getNextStatus = (currentStatus) => {
+  const getNextStatus = currentStatus => {
     switch (currentStatus) {
-      case 'IN_PROGRESS': return 'PENDING';
-      case 'PENDING': return 'COMPLETED';
-      default: return currentStatus;
+      case 'IN_PROGRESS':
+        return 'PENDING';
+      case 'PENDING':
+        return 'COMPLETED';
+      default:
+        return currentStatus;
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = status => {
     switch (status) {
-      case 'IN_PROGRESS': return '#2196F3';
-      case 'PENDING': return '#FF9800';
-      case 'COMPLETED': return '#4CAF50';
-      case 'CANCELLED': return '#F44336';
-      default: return '#000';
+      case 'IN_PROGRESS':
+        return '#2196F3';
+      case 'PENDING':
+        return '#FF9800';
+      case 'COMPLETED':
+        return '#4CAF50';
+      case 'CANCELLED':
+        return '#F44336';
+      default:
+        return '#000';
     }
   };
 
-  const getCardBackground = (status) => {
+  const getCardBackground = status => {
     switch (status) {
-      case 'COMPLETED': return '#e8f5e9';
-      case 'CANCELLED': return '#ffebee';
-      default: return 'white';
+      case 'COMPLETED':
+        return '#e8f5e9';
+      case 'CANCELLED':
+        return '#ffebee';
+      default:
+        return 'white';
     }
   };
 
   const handleStatusChange = async (order, newStatus) => {
     const originalOrders = [...allOrders];
-    
+
     try {
       // Optimistic update
-      const updatedOrders = allOrders.map(o => 
-        o.id === order.id ? { ...o, status: newStatus } : o
+      const updatedOrders = allOrders.map(o =>
+        o.id === order.id ? {...o, status: newStatus} : o,
       );
       setAllOrders(updatedOrders);
-      
+
       if (modalVisible) {
         setModalVisible(false);
       }
-      
+
       await api.patch(`/order/${order.id}/status`, null, {
-        params: { status: newStatus }
+        params: {status: newStatus},
       });
-      
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(`Order #${order.id} updated to ${newStatus}`, ToastAndroid.SHORT);
-      }
+
     } catch (err) {
       console.error('Error updating order status:', err);
       setAllOrders(originalOrders);
@@ -229,12 +275,12 @@ const OrderScreen = () => {
 
   const handleDeleteOrder = async () => {
     const originalOrders = [...allOrders];
-    
+
     try {
       const updatedOrders = allOrders.filter(o => o.id !== selectedOrder.id);
       setAllOrders(updatedOrders);
       setModalVisible(false);
-      
+
       await api.delete(`/order/${selectedOrder.id}`);
     } catch (err) {
       console.error('Error deleting order:', err);
@@ -243,34 +289,34 @@ const OrderScreen = () => {
     }
   };
 
-  const showSnackbar = (message) => {
+  const showSnackbar = message => {
     setSnackbarMessage(message);
     setSnackbarVisible(true);
   };
 
-  const handleAddItem = async (itemId) => {
+  const handleAddItem = async itemId => {
     const originalOrders = [...allOrders];
     const originalSelectedOrder = selectedOrder;
-    
+
     try {
       const updatedOrders = allOrders.map(o => {
         if (o.id === selectedOrder.id) {
-          return { ...o, itemIds: [...(o.itemIds || []), itemId] };
+          return {...o, itemIds: [...(o.itemIds || []), itemId]};
         }
         return o;
       });
-      
+
       setAllOrders(updatedOrders);
-      
+
       if (selectedOrder) {
         setSelectedOrder({
           ...selectedOrder,
-          itemIds: [...(selectedOrder.itemIds || []), itemId]
+          itemIds: [...(selectedOrder.itemIds || []), itemId],
         });
       }
-      
+
       await api.patch(`/order/${selectedOrder.id}/add-item`, null, {
-        params: { itemId }
+        params: {itemId},
       });
     } catch (err) {
       console.error('Error adding item:', err);
@@ -280,38 +326,40 @@ const OrderScreen = () => {
     }
   };
 
-  const handleRemoveItem = async (itemId) => {
+  const handleRemoveItem = async itemId => {
     const originalOrders = [...allOrders];
     const originalSelectedOrder = selectedOrder;
-    
+
     try {
       if (!selectedOrder) {
         showSnackbar('No order selected');
         return;
       }
-  
-      const itemIndex = selectedOrder.itemIds.findIndex(id => Number(id) === Number(itemId));
-      
+
+      const itemIndex = selectedOrder.itemIds.findIndex(
+        id => Number(id) === Number(itemId),
+      );
+
       if (itemIndex === -1) {
         showSnackbar('Item not found in order');
         return;
       }
-  
+
       const updatedItemIds = [...selectedOrder.itemIds];
       updatedItemIds.splice(itemIndex, 1);
-  
-      setAllOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === selectedOrder.id 
-            ? { ...order, itemIds: updatedItemIds }
-            : order
-        )
+
+      setAllOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === selectedOrder.id
+            ? {...order, itemIds: updatedItemIds}
+            : order,
+        ),
       );
-  
-      setSelectedOrder(prev => ({ ...prev, itemIds: updatedItemIds }));
-  
+
+      setSelectedOrder(prev => ({...prev, itemIds: updatedItemIds}));
+
       await api.patch(`/order/${selectedOrder.id}/remove-item`, null, {
-        params: { itemId }
+        params: {itemId},
       });
     } catch (err) {
       console.error('Error removing item:', err);
@@ -323,35 +371,44 @@ const OrderScreen = () => {
 
   const renderEditModal = () => {
     const groupedItems = groupItems(selectedOrder?.itemIds);
-    
+
     return (
       <Modal
         transparent
         visible={editModalVisible}
         animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
+        onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.editModalBox}>
-            <Text style={styles.modalTitle}>Edit Order #{selectedOrder?.id}</Text>
-            
+            <Text style={styles.modalTitle}>
+              Edit Order #{selectedOrder?.id}
+            </Text>
+
             <Text style={styles.sectionTitle}>Current Items:</Text>
             {groupedItems.length > 0 ? (
               groupedItems.map((item, index) => (
                 <View key={`${item.id}-${index}`} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.name} (x{item.count})</Text>
+                  <Text style={styles.itemName}>
+                    {item.name} (x{item.count})
+                  </Text>
                   <View style={styles.quantityControls}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.quantityButton, styles.removeButton]}
-                      onPress={() => handleRemoveItem(item.id)}
-                    >
-                      <MaterialCommunityIcons name="minus" size={20} color="white" />
+                      onPress={() => handleRemoveItem(item.id)}>
+                      <MaterialCommunityIcons
+                        name="minus"
+                        size={20}
+                        color="white"
+                      />
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.quantityButton, styles.addButton]}
-                      onPress={() => handleAddItem(item.id)}
-                    >
-                      <MaterialCommunityIcons name="plus" size={20} color="white" />
+                      onPress={() => handleAddItem(item.id)}>
+                      <MaterialCommunityIcons
+                        name="plus"
+                        size={20}
+                        color="white"
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -359,29 +416,36 @@ const OrderScreen = () => {
             ) : (
               <Text style={styles.emptyText}>No items in this order</Text>
             )}
-            
+
             <Text style={styles.sectionTitle}>Add New Items:</Text>
             <FlatList
               data={allItems}
-              renderItem={({ item }) => (
+              renderItem={({item}) => (
                 <View style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.name} (${item.price})</Text>
-                  <TouchableOpacity 
+                  <Text style={styles.itemName}>
+                    {item.name} (${item.price})
+                  </Text>
+                  <TouchableOpacity
                     style={[styles.quantityButton, styles.addButton]}
-                    onPress={() => handleAddItem(item.id)}
-                  >
-                    <MaterialCommunityIcons name="plus" size={20} color="white" />
+                    onPress={() => handleAddItem(item.id)}>
+                    <MaterialCommunityIcons
+                      name="plus"
+                      size={20}
+                      color="white"
+                    />
                   </TouchableOpacity>
                 </View>
               )}
               keyExtractor={item => item.id.toString()}
               maxHeight={200}
             />
-            
+
             <Pressable
-              style={[styles.modalOption, { backgroundColor: '#6200ee', marginTop: 20 }]}
-              onPress={() => setEditModalVisible(false)}
-            >
+              style={[
+                styles.modalOption,
+                {backgroundColor: '#6200ee', marginTop: 20},
+              ]}
+              onPress={() => setEditModalVisible(false)}>
               <Text style={styles.modalOptionText}>Done</Text>
             </Pressable>
           </View>
@@ -390,48 +454,49 @@ const OrderScreen = () => {
     );
   };
 
-  const renderRightActions = (item) => {
+  const renderRightActions = item => {
     if (item.status === 'COMPLETED') return null;
-    
+
     const nextStatus = getNextStatus(item.status);
     const bgColor = nextStatus === 'PENDING' ? '#FF9800' : '#4CAF50';
 
     return (
       <RectButton
-        style={[styles.actionContainer, { backgroundColor: bgColor }]}
-        onPress={() => handleStatusChange(item, nextStatus)}
-      >
+        style={[styles.actionContainer, {backgroundColor: bgColor}]}
+        onPress={() => handleStatusChange(item, nextStatus)}>
         <Text style={styles.actionText}>{nextStatus.replace('_', ' ')}</Text>
       </RectButton>
     );
   };
 
-  const renderLeftActions = (item) => {
+  const renderLeftActions = item => {
     if (item.status === 'COMPLETED') return null;
 
     return (
       <RectButton
-        style={[styles.actionContainer, { backgroundColor: '#F44336' }]}
+        style={[styles.actionContainer, {backgroundColor: '#F44336'}]}
         onPress={() => {
           Alert.alert(
             'Cancel Order',
             'Are you sure you want to cancel this order?',
             [
-              { text: 'No', style: 'cancel' },
-              { text: 'Yes', onPress: () => handleStatusChange(item, 'CANCELLED') }
-            ]
+              {text: 'No', style: 'cancel'},
+              {
+                text: 'Yes',
+                onPress: () => handleStatusChange(item, 'CANCELLED'),
+              },
+            ],
           );
-        }}
-      >
+        }}>
         <Text style={styles.actionText}>CANCEL</Text>
       </RectButton>
     );
   };
 
-  const getStaffName = async (staffId) => {
+  const getStaffName = async staffId => {
     try {
       const response = await api.get(`/staff/${staffId}`);
-      setStaffNames((prevNames) => ({
+      setStaffNames(prevNames => ({
         ...prevNames,
         [staffId]: response.data.name,
       }));
@@ -440,11 +505,11 @@ const OrderScreen = () => {
     }
   };
 
-  const getTableNumber = async (tableId) => {
+  const getTableNumber = async tableId => {
     try {
       const response = await api.get(`/table/${tableId}`);
-      console.log(response.data)
-      setTableIds((prevIds) => ({
+      console.log(response.data);
+      setTableIds(prevIds => ({
         ...prevIds,
         [tableId]: response.data.tableNumber,
       }));
@@ -453,7 +518,7 @@ const OrderScreen = () => {
     }
   };
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({item}) => (
     <View style={styles.swipeableOuterContainer}>
       <Swipeable
         renderRightActions={() => renderRightActions(item)}
@@ -470,35 +535,48 @@ const OrderScreen = () => {
               'Cancel Order',
               'Are you sure you want to cancel this order?',
               [
-                { text: 'No', style: 'cancel', onPress: () => {} },
-                { text: 'Yes', onPress: () => handleStatusChange(item, 'CANCELLED') }
-              ]
+                {text: 'No', style: 'cancel', onPress: () => {}},
+                {
+                  text: 'Yes',
+                  onPress: () => handleStatusChange(item, 'CANCELLED'),
+                },
+              ],
             );
           }
         }}
         friction={2}
         rightThreshold={40}
-        leftThreshold={40}
-      >
-        <TouchableOpacity 
+        leftThreshold={40}>
+        <TouchableOpacity
           onPress={() => {
             setSelectedOrder(item);
             setModalVisible(true);
           }}
-          activeOpacity={0.9}
-        >
-          <Card style={[styles.card, { backgroundColor: getCardBackground(item.status) }]}>
+          activeOpacity={0.9}>
+          <Card
+            style={[
+              styles.card,
+              {backgroundColor: getCardBackground(item.status)},
+            ]}>
             <Card.Content>
               <Title>Order #{item.id}</Title>
-              <Paragraph>Table: {tableIds[item.tableDataId] || 'Loading...'}</Paragraph>
-              <Paragraph>Date: {new Date(item.date).toLocaleString()}</Paragraph>
+              <Paragraph>
+                Table: {tableIds[item.tableDataId] || 'Loading...'}
+              </Paragraph>
+              <Paragraph>
+                Date: {new Date(item.date).toLocaleString()}
+              </Paragraph>
               <View style={styles.statusRow}>
                 <Text>Status: </Text>
-                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                <Text
+                  style={[
+                    styles.statusText,
+                    {color: getStatusColor(item.status)},
+                  ]}>
                   {item.status.replace('_', ' ')}
                 </Text>
-                
-                <Paragraph style={{ marginLeft: 'auto' }}>
+
+                <Paragraph style={{marginLeft: 'auto'}}>
                   Staff: {staffNames[item.staffId] || 'Loading...'}
                 </Paragraph>
               </View>
@@ -515,16 +593,18 @@ const OrderScreen = () => {
     </View>
   );
 
-  const renderStatusFilter = (status) => (
+  const renderStatusFilter = status => (
     <TouchableOpacity
       key={status}
       style={[
         styles.filterButton,
-        statusFilter === status && styles.activeFilterButton
+        statusFilter === status && styles.activeFilterButton,
       ]}
-      onPress={() => setStatusFilter(status)}
-    >
-      <Text style={statusFilter === status ? styles.activeFilterText : styles.filterText}>
+      onPress={() => setStatusFilter(status)}>
+      <Text
+        style={
+          statusFilter === status ? styles.activeFilterText : styles.filterText
+        }>
         {status.replace('_', ' ')}
       </Text>
     </TouchableOpacity>
@@ -552,18 +632,16 @@ const OrderScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Orders</Text>
 
-      <View style={styles.filterRow}>
-        {statuses.map(renderStatusFilter)}
-      </View>
+      <View style={styles.filterRow}>{statuses.map(renderStatusFilter)}</View>
 
       <View style={styles.toggleRow}>
         <Text style={styles.toggleText}>Only My Orders</Text>
         <Switch
           value={onlyMine}
-          onValueChange={(value) => {
+          onValueChange={value => {
             setOnlyMine(value);
           }}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          trackColor={{false: '#767577', true: '#81b0ff'}}
           thumbColor={onlyMine ? '#6200ee' : '#f4f3f4'}
         />
       </View>
@@ -578,7 +656,7 @@ const OrderScreen = () => {
         <FlatList
           data={filteredOrders}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={item => item.id.toString()}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
@@ -591,73 +669,78 @@ const OrderScreen = () => {
         />
       )}
       {(role === 'ADMIN' || role === 'WAITER') && (
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleAddOrder}
-      >
-        <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-          <MaterialCommunityIcons name="plus" size={24} color="white" />
-        </View>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.fab} onPress={handleAddOrder}>
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <MaterialCommunityIcons name="plus" size={24} color="white" />
+          </View>
+        </TouchableOpacity>
       )}
 
       <Modal
         transparent
         visible={modalVisible}
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
+        onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Order #{selectedOrder?.id}</Text>
-            
+
             <Text style={styles.sectionTitle}>Change Status:</Text>
-            {statuses.map((status) => (
+            {statuses.map(status => (
               <Pressable
                 key={status}
-                style={[styles.modalOption, { 
-                  backgroundColor: getStatusColor(status) 
-                }]}
+                style={[
+                  styles.modalOption,
+                  {
+                    backgroundColor: getStatusColor(status),
+                  },
+                ]}
                 onPress={() => {
                   handleStatusChange(selectedOrder, status);
-                }}
-              >
-                <Text style={styles.modalOptionText}>{status.replace('_', ' ')}</Text>
+                }}>
+                <Text style={styles.modalOptionText}>
+                  {status.replace('_', ' ')}
+                </Text>
               </Pressable>
             ))}
-            
+
             <Text style={styles.sectionTitle}>Actions:</Text>
             <Pressable
-              style={[styles.modalOption, { backgroundColor: '#6200ee' }]}
+              style={[styles.modalOption, {backgroundColor: '#6200ee'}]}
               onPress={() => {
                 setModalVisible(false);
                 setEditModalVisible(true);
-              }}
-            >
+              }}>
               <Text style={styles.modalOptionText}>Edit Items</Text>
             </Pressable>
-            
+
             <Pressable
-              style={[styles.modalOption, { backgroundColor: '#d32f2f' }]}
+              style={[styles.modalOption, {backgroundColor: '#d32f2f'}]}
               onPress={() => {
                 Alert.alert(
                   'Delete Order',
                   'Are you sure you want to delete this order?',
                   [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', onPress: handleDeleteOrder }
-                  ]
+                    {text: 'Cancel', style: 'cancel'},
+                    {text: 'Delete', onPress: handleDeleteOrder},
+                  ],
                 );
-              }}
-            >
+              }}>
               <Text style={styles.modalOptionText}>Delete Order</Text>
             </Pressable>
-            
+
             <Pressable
-              style={[styles.modalOption, { backgroundColor: '#ccc' }]}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={[styles.modalOptionText, { color: '#333' }]}>Cancel</Text>
+              style={[styles.modalOption, {backgroundColor: '#ccc'}]}
+              onPress={() => setModalVisible(false)}>
+              <Text style={[styles.modalOptionText, {color: '#333'}]}>
+                Cancel
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -672,8 +755,7 @@ const OrderScreen = () => {
         action={{
           label: 'Dismiss',
           onPress: () => setSnackbarVisible(false),
-        }}
-      >
+        }}>
         {snackbarMessage}
       </Snackbar>
     </View>

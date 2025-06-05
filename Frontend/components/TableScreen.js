@@ -423,10 +423,13 @@ const TableScreen = ({navigation}) => {
         );
         break;
       case 'up':
-        newY = Math.max(tableHeight, newTable.y - GRID_CELL_SIZE);
+        newY = Math.max(0, newTable.y - GRID_CELL_SIZE);
         break;
       case 'down':
-        newY = Math.max(0, newTable.y + GRID_CELL_SIZE);
+        newY = Math.min(
+        gridDimensions.height - tableHeight,
+        newTable.y + GRID_CELL_SIZE,
+      );
         break;
     }
 
@@ -496,7 +499,7 @@ const TableScreen = ({navigation}) => {
       (newTable.shape === 'CIRCLE' ? newTable.radius * 2 : 100);
 
     const screenX = newTable.x;
-    const screenY = gridDimensions.height - newTable.y - tableHeight;
+    const screenY = newTable.y - tableHeight;
 
     const tableStyles = {
       position: 'absolute',

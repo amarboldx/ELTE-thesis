@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  ActivityIndicator, 
-  TouchableOpacity, 
-  Modal, 
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  Modal,
   Pressable,
   Alert,
-  ToastAndroid,
   Platform,
   Dimensions,
   RefreshControl,
 } from 'react-native';
-import { Card, Title, Paragraph, Snackbar } from 'react-native-paper';
+import {Card, Title, Paragraph, Snackbar} from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RectButton, Swipeable } from 'react-native-gesture-handler';
+import {RectButton, Swipeable} from 'react-native-gesture-handler';
 import api from './config/api';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import NotificationService from './NotificationService';
 
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 const statuses = ['PENDING', 'CONFIRMED', 'CANCELLED'];
 
 const ReservationsScreen = () => {
@@ -36,7 +36,7 @@ const ReservationsScreen = () => {
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState('');
 
   const navigation = useNavigation();
 
@@ -45,10 +45,50 @@ const ReservationsScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (allReservations.length > 0) {
-      applyFilters();
-    }
+    applyFilters();
   }, [statusFilter, allReservations]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchReservations();
+    }, []),
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      NotificationService.setCurrentScreen('reservations');
+      NotificationService.resetReservationUnreadCount();
+
+      const unsubscribe = NotificationService.addReservationListener(event => {
+        console.log('Reservation event received:', event);
+        switch (event.eventType) {
+          case 'created':
+            setAllReservations(prev => [event.reservation, ...prev]);
+            break;
+          case 'status-updated':
+          case 'updated': 
+            setAllReservations(prev =>
+              prev.map(r =>
+                r.id === event.reservation.id ? event.reservation : r
+              )
+            );
+            break;
+          case 'deleted':
+            setAllReservations(prev =>
+              prev.filter(r => r.id !== event.reservation.id)
+            );
+            break;
+          default:
+            console.log('Unknown reservation event type:', event.eventType);
+        }
+      });
+
+      return () => {
+        NotificationService.setCurrentScreen(null);
+        unsubscribe();
+      };
+    }, []),
+  );
 
   const checkToken = async () => {
     try {
@@ -78,7 +118,11 @@ const ReservationsScreen = () => {
       setError(null);
     } catch (err) {
       console.error('Error fetching reservations:', err);
-      setError(err.response ? `Failed to load reservations. Server returned ${err.response.status}` : 'An error occurred while fetching reservations');
+      setError(
+        err.response
+          ? `Failed to load reservations. Server returned ${err.response.status}`
+          : 'An error occurred while fetching reservations',
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,68 +131,82 @@ const ReservationsScreen = () => {
 
   const applyFilters = () => {
     let result = [...allReservations];
-    
     if (statusFilter) {
-      result = result.filter(reservation => reservation.status === statusFilter);
+      result = result.filter(
+        reservation => reservation.status === statusFilter,
+      );
     }
-    
     setFilteredReservations(result);
   };
 
-  const showSnackbar = (message) => {
+  const showSnackbar = message => {
     setSnackbarMessage(message);
     setSnackbarVisible(true);
   };
 
-  const getNextStatus = (currentStatus) => {
+  const getNextStatus = currentStatus => {
     switch (currentStatus) {
-      case 'PENDING': return 'CONFIRMED';
-      case 'CONFIRMED': return 'CANCELLED';
-      default: return currentStatus;
+      case 'PENDING':
+        return 'CONFIRMED';
+      case 'CONFIRMED':
+        return 'CANCELLED';
+      default:
+        return currentStatus;
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = status => {
     switch (status) {
-      case 'PENDING': return '#FF9800';
-      case 'CONFIRMED': return '#4CAF50';
-      case 'CANCELLED': return '#F44336';
-      default: return '#000';
+      case 'PENDING':
+        return '#FF9800';
+      case 'CONFIRMED':
+        return '#4CAF50';
+      case 'CANCELLED':
+        return '#F44336';
+      default:
+        return '#000';
     }
   };
 
-  const getCardBackground = (status) => {
+  const getCardBackground = status => {
     switch (status) {
-      case 'CONFIRMED': return '#e8f5e9';
-      case 'CANCELLED': return '#ffebee';
-      default: return 'white';
+      case 'CONFIRMED':
+        return '#e8f5e9';
+      case 'CANCELLED':
+        return '#ffebee';
+      default:
+        return 'white';
     }
   };
 
   const changeReservationStatus = async (reservation, newStatus) => {
-    const originalReservations = [...allReservations];
-    
+    const originalStatus = reservation.status;
+
+    const updatedReservations = allReservations.map(r =>
+      r.id === reservation.id ? {...r, status: newStatus} : r,
+    );
+
+    setAllReservations(updatedReservations); 
+    applyFilters();
+
+    if (modalVisible) {
+      setModalVisible(false);
+    }
+
     try {
-      // Optimistic update
-      const updatedReservations = allReservations.map(r => 
-        r.id === reservation.id ? { ...r, status: newStatus } : r
-      );
-      setAllReservations(updatedReservations);
-      
-      if (modalVisible) {
-        setModalVisible(false);
-      }
-
       await api.patch(`/reservations/${reservation.id}/status`, null, {
-        params: { status: newStatus },
+        params: {status: newStatus},
       });
-
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(`Reservation #${reservation.id} updated to ${newStatus}`, ToastAndroid.SHORT);
-      }
     } catch (err) {
       console.error('Error updating reservation status:', err);
-      setAllReservations(originalReservations); // Revert on error
+
+      const revertedReservations = allReservations.map(r =>
+        r.id === reservation.id ? {...r, status: originalStatus} : r,
+      );
+
+      setAllReservations(revertedReservations);
+      applyFilters();
+
       showSnackbar('Failed to update reservation status');
     }
   };
@@ -160,15 +218,14 @@ const ReservationsScreen = () => {
 
   const renderRightActions = (reservation, progress, dragX) => {
     if (reservation.status === 'CANCELLED') return null;
-    
+
     const nextStatus = getNextStatus(reservation.status);
     const bgColor = nextStatus === 'CONFIRMED' ? '#4CAF50' : '#F44336';
 
     return (
       <RectButton
-        style={[styles.actionContainer, { backgroundColor: bgColor }]}
-        onPress={() => changeReservationStatus(reservation, nextStatus)}
-      >
+        style={[styles.actionContainer, {backgroundColor: bgColor}]}
+        onPress={() => changeReservationStatus(reservation, nextStatus)}>
         <Text style={styles.actionText}>{nextStatus}</Text>
       </RectButton>
     );
@@ -179,28 +236,35 @@ const ReservationsScreen = () => {
 
     return (
       <RectButton
-        style={[styles.actionContainer, { backgroundColor: '#F44336' }]}
+        style={[styles.actionContainer, {backgroundColor: '#F44336'}]}
         onPress={() => {
           Alert.alert(
             'Cancel Reservation',
             'Are you sure you want to cancel this reservation?',
             [
-              { text: 'No', style: 'cancel' },
-              { text: 'Yes', onPress: () => changeReservationStatus(reservation, 'CANCELLED') }
-            ]
+              {text: 'No', style: 'cancel'},
+              {
+                text: 'Yes',
+                onPress: () =>
+                  changeReservationStatus(reservation, 'CANCELLED'),
+              },
+            ],
           );
-        }}
-      >
+        }}>
         <Text style={styles.actionText}>CANCEL</Text>
       </RectButton>
     );
   };
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({item}) => (
     <View style={styles.swipeableOuterContainer}>
       <Swipeable
-        renderRightActions={(progress, dragX) => renderRightActions(item, progress, dragX)}
-        renderLeftActions={(progress, dragX) => renderLeftActions(item, progress, dragX)}
+        renderRightActions={(progress, dragX) =>
+          renderRightActions(item, progress, dragX)
+        }
+        renderLeftActions={(progress, dragX) =>
+          renderLeftActions(item, progress, dragX)
+        }
         onSwipeableRightOpen={() => {
           if (item.status !== 'CANCELLED') {
             const nextStatus = getNextStatus(item.status);
@@ -213,34 +277,49 @@ const ReservationsScreen = () => {
               'Cancel Reservation',
               'Are you sure you want to cancel this reservation?',
               [
-                { text: 'No', style: 'cancel', onPress: () => {} },
-                { text: 'Yes', onPress: () => changeReservationStatus(item, 'CANCELLED') }
-              ]
+                {text: 'No', style: 'cancel', onPress: () => {}},
+                {
+                  text: 'Yes',
+                  onPress: () => changeReservationStatus(item, 'CANCELLED'),
+                },
+              ],
             );
           }
         }}
         friction={2}
         rightThreshold={40}
         leftThreshold={40}
-        containerStyle={styles.swipeableContainer}
-      >
-        <TouchableOpacity 
+        containerStyle={styles.swipeableContainer}>
+        <TouchableOpacity
           onPress={() => {
             setSelectedReservation(item);
             setModalVisible(true);
           }}
-          activeOpacity={0.9}
-        >
-          <Card style={[styles.card, { backgroundColor: getCardBackground(item.status) }]}>
+          activeOpacity={0.9}>
+          <Card
+            style={[
+              styles.card,
+              {backgroundColor: getCardBackground(item.status)},
+            ]}>
             <Card.Content>
               <Title>{`Reservation #${item.id}`}</Title>
               <Paragraph>{`Customer: ${item.customerName || 'N/A'}`}</Paragraph>
               <Paragraph>{`Table ID: ${item.tableId}`}</Paragraph>
-              <Paragraph>{`Start: ${new Date(item.startTime).toLocaleString()}`}</Paragraph>
-              <Paragraph>{`End: ${new Date(item.endTime).toLocaleString()}`}</Paragraph>
+              <Paragraph>{`Start: ${new Date(
+                item.startTime,
+              ).toLocaleString()}`}</Paragraph>
+              <Paragraph>{`End: ${new Date(
+                item.endTime,
+              ).toLocaleString()}`}</Paragraph>
               <View style={styles.statusRow}>
                 <Text>Status: </Text>
-                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
+                <Text
+                  style={[
+                    styles.statusText,
+                    {color: getStatusColor(item.status)},
+                  ]}>
+                  {item.status}
+                </Text>
               </View>
             </Card.Content>
           </Card>
@@ -249,13 +328,19 @@ const ReservationsScreen = () => {
     </View>
   );
 
-  const renderStatusButton = (label) => (
+  const renderStatusButton = label => (
     <TouchableOpacity
       key={label}
-      style={[styles.filterButton, statusFilter === label && styles.filterButtonActive]}
-      onPress={() => setStatusFilter(label)}
-    >
-      <Text style={[styles.filterText, statusFilter === label && styles.filterTextActive]}>
+      style={[
+        styles.filterButton,
+        statusFilter === label && styles.filterButtonActive,
+      ]}
+      onPress={() => setStatusFilter(label)}>
+      <Text
+        style={[
+          styles.filterText,
+          statusFilter === label && styles.filterTextActive,
+        ]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -265,19 +350,17 @@ const ReservationsScreen = () => {
     navigation.navigate('AddReservation');
   };
 
-  const deleteReservation = async (reservationId) => {
+  const deleteReservation = async reservationId => {
     const originalReservations = [...allReservations];
-    
+
     try {
-      const updatedReservations = allReservations.filter(r => r.id !== reservationId);
+      const updatedReservations = allReservations.filter(
+        r => r.id !== reservationId,
+      );
       setAllReservations(updatedReservations);
       setModalVisible(false);
-  
+
       await api.delete(`/reservations/${reservationId}`);
-  
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(`Reservation #${reservationId} deleted`, ToastAndroid.SHORT);
-      }
     } catch (err) {
       console.error('Error deleting reservation:', err);
       setAllReservations(originalReservations);
@@ -299,7 +382,7 @@ const ReservationsScreen = () => {
       <Text style={styles.title}>Reservations</Text>
 
       <View style={styles.statusFilterContainer}>
-        {statuses.map((status) => renderStatusButton(status))}
+        {statuses.map(status => renderStatusButton(status))}
       </View>
 
       {error ? (
@@ -314,7 +397,7 @@ const ReservationsScreen = () => {
         <FlatList
           data={filteredReservations}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={item => item.id.toString()}
           contentContainerStyle={styles.listContainer}
           refreshControl={
             <RefreshControl
@@ -327,58 +410,59 @@ const ReservationsScreen = () => {
         />
       )}
       {(role === 'ADMIN' || role === 'WAITER') && (
-      <TouchableOpacity style={styles.fab} onPress={handleAddReservation}>
-        <MaterialCommunityIcons name="plus" size={24} color="white" />
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.fab} onPress={handleAddReservation}>
+          <MaterialCommunityIcons name="plus" size={24} color="white" />
+        </TouchableOpacity>
       )}
 
       <Modal
         transparent
         animationType="slide"
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+        onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Change Reservation Status</Text>
-            {statuses.map((status) => (
+            {statuses.map(status => (
               <Pressable
                 key={status}
-                style={[styles.modalButton, { backgroundColor: getStatusColor(status) }]}
+                style={[
+                  styles.modalButton,
+                  {backgroundColor: getStatusColor(status)},
+                ]}
                 onPress={() => {
                   changeReservationStatus(selectedReservation, status);
                   setModalVisible(false);
-                }}
-              >
+                }}>
                 <Text style={styles.modalButtonText}>{status}</Text>
               </Pressable>
             ))}
 
             <Pressable
-              style={[styles.modalButton, { backgroundColor: '#d32f2f' }]}
+              style={[styles.modalButton, {backgroundColor: '#d32f2f'}]}
               onPress={() => {
                 Alert.alert(
                   'Delete Reservation',
                   'Are you sure you want to permanently delete this reservation?',
                   [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Delete', 
+                    {text: 'Cancel', style: 'cancel'},
+                    {
+                      text: 'Delete',
                       onPress: () => deleteReservation(selectedReservation.id),
-                      style: 'destructive'
-                    }
-                  ]
+                      style: 'destructive',
+                    },
+                  ],
                 );
-              }}
-            >
+              }}>
               <Text style={styles.modalButtonText}>Delete Reservation</Text>
             </Pressable>
 
             <Pressable
-              style={[styles.modalButton, { backgroundColor: '#ccc' }]}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={[styles.modalButtonText, { color: 'black' }]}>Cancel</Text>
+              style={[styles.modalButton, {backgroundColor: '#ccc'}]}
+              onPress={() => setModalVisible(false)}>
+              <Text style={[styles.modalButtonText, {color: 'black'}]}>
+                Cancel
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -391,8 +475,7 @@ const ReservationsScreen = () => {
         action={{
           label: 'Dismiss',
           onPress: () => setSnackbarVisible(false),
-        }}
-      >
+        }}>
         {snackbarMessage}
       </Snackbar>
     </View>
@@ -449,7 +532,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
-    height: 'auto'
+    height: 'auto',
   },
   actionContainer: {
     justifyContent: 'center',

@@ -12,9 +12,10 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.1.0") 
+        classpath("com.android.tools.build:gradle:8.1.0")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        
     }
 }
 
@@ -22,5 +23,51 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        maven {
+            url("$rootDir/../node_modules/jsc-android/dist")
+        }
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('com.android.application') || project.plugins.hasPlugin('com.android.library')) {
+            project.android {
+                compileSdkVersion rootProject.ext.compileSdkVersion
+
+                defaultConfig {
+                    minSdkVersion rootProject.ext.minSdkVersion
+                    targetSdkVersion rootProject.ext.targetSdkVersion
+                }
+
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_11
+                    targetCompatibility JavaVersion.VERSION_11
+                }
+            }
+
+            if (project.plugins.hasPlugin('org.jetbrains.kotlin.android')) {
+                project.android {
+                    kotlinOptions {
+                        jvmTarget = "17"
+                    }
+                }
+            }
+
+            configurations.all {
+                resolutionStrategy {
+                    force 'androidx.core:core:1.13.1'
+                    eachDependency { DependencyResolveDetails details ->
+                        if (details.requested.group == 'com.android.support') {
+                            details.useVersion '28.0.0'
+                            details.because 'Avoid support-compat conflicts with AndroidX'
+                        }
+                    }
+                }
+            }
+        }
     }
 }
