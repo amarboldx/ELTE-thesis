@@ -21,12 +21,15 @@ import java.util.Optional;
 @RequiredArgsConstructor(onConstructor_ = @__(@Autowired))
 public class ReservationController {
     private final ReservationUseCases reservationUseCases;
+    private final SseController sseController;
 
     @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PostMapping
     public ResponseEntity<ReservationResponseDTO> createReservation(@RequestBody ReservationDTO reservationDTO) {
-        return ResponseEntity.ok(reservationUseCases.createReservation(reservationDTO));
+        ReservationResponseDTO created = reservationUseCases.createReservation(reservationDTO);
+        sseController.sendReservationEvent("created", created);
+        return ResponseEntity.ok(created);
     }
 
     @Transactional
@@ -68,6 +71,7 @@ public class ReservationController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReservationById(@PathVariable Long id) {
         reservationUseCases.deleteReservationById(id);
+        sseController.sendReservationEvent("deleted", reservationUseCases.getReservationById(id).orElse(null));
         return ResponseEntity.noContent().build();
     }
 
@@ -75,7 +79,17 @@ public class ReservationController {
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateReservationStatus(@PathVariable Long id, @RequestParam ReservationStatus status) {
+        Optional<ReservationResponseDTO> existingReservation = reservationUseCases.getReservationById(id);
+        if (!existingReservation.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
         reservationUseCases.updateReservationStatus(id, status);
+
+        ReservationResponseDTO updatedReservation = reservationUseCases.getReservationById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found after update"));
+
+        sseController.sendReservationEvent("status-updated", updatedReservation);
         return ResponseEntity.ok().build();
     }
 

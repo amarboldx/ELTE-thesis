@@ -18,6 +18,7 @@ import java.util.List;
 @RequestMapping("api/v1/order")
 public class OrderController {
     private final OrderUseCases orderUseCases;
+    private final SseController sseController;
 
     @Transactional
     @GetMapping
@@ -63,29 +64,44 @@ public class OrderController {
     public ResponseEntity<List<OrderDTO>> getOrdersByStatus(@PathVariable OrderStatus status) {
         return ResponseEntity.ok(orderUseCases.getOrdersByStatus(status));
     }
+
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PostMapping
     public ResponseEntity<OrderDTO> createOrder(@RequestBody OrderDTO orderDTO) {
-        return ResponseEntity.ok(orderUseCases.createOrder(orderDTO));
+        OrderDTO createdOrder = orderUseCases.createOrder(orderDTO);
+        sseController.sendOrderEvent("created", createdOrder);
+        return ResponseEntity.ok(createdOrder);
     }
+
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        OrderDTO orderToDelete = orderUseCases.getOrderById(id); // Get before deleting
         orderUseCases.deleteOrder(id);
+        sseController.sendOrderEvent("deleted", orderToDelete);
         return ResponseEntity.noContent().build();
     }
+
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateOrderStatus(@PathVariable Long id, @RequestParam OrderStatus status) {
-        orderUseCases.updateOrderStatus(id, status);
+        OrderDTO updatedOrder = orderUseCases.updateOrderStatus(id, status);
+        sseController.sendOrderEvent("status-updated", updatedOrder);
         return ResponseEntity.ok().build();
     }
+
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
     @PatchMapping("/{id}/add-item")
     public ResponseEntity<Void> addItemToOrder(@PathVariable Long id, @RequestParam Long itemId) {
         orderUseCases.addItemToList(id, itemId);
         return ResponseEntity.ok().build();
     }
+
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PatchMapping("/{id}/remove-item")
     public ResponseEntity<Void> removeItemFromOrder(
@@ -100,6 +116,7 @@ public class OrderController {
         }
     }
 
+    @Transactional
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER') or hasRole('ROLE_CHEF')")
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelOrder(@PathVariable Long id) {

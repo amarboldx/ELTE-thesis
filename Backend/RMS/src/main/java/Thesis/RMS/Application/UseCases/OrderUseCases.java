@@ -174,7 +174,7 @@ public class OrderUseCases {
         orderRepository.save(order);
     }
 
-    public void updateOrderStatus(Long orderId, OrderStatus status) {
+    public OrderDTO updateOrderStatus(Long orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
 
@@ -186,18 +186,19 @@ public class OrderUseCases {
         if (status == OrderStatus.IN_PROGRESS || status == OrderStatus.PENDING) {
             table.setTableStatus(TableStatus.OCCUPIED);
             tableDataRepository.save(table);
-            return;
+        } else {
+            List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
+
+            boolean allComplete = tableOrders.stream()
+                    .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
+
+            if (allComplete) {
+                table.setTableStatus(TableStatus.AVAILABLE);
+                tableDataRepository.save(table);
+            }
         }
 
-        List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
-
-        boolean allComplete = tableOrders.stream()
-                .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
-
-        if (allComplete) {
-            table.setTableStatus(TableStatus.AVAILABLE);
-            tableDataRepository.save(table);
-        }
+        return convertToDTO(order); // Always return updated DTO
     }
 
 

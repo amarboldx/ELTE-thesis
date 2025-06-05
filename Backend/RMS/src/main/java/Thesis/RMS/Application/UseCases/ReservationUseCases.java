@@ -104,6 +104,13 @@ public class ReservationUseCases {
                     tableDataRepository.save(table);
                 }
             }
+            if (status == ReservationStatus.CANCELLED) {
+                TableData table = reservation.getTableData();
+                if (table != null) {
+                    table.setTableStatus(TableStatus.AVAILABLE);
+                    tableDataRepository.save(table);
+                }
+            }
 
             reservationRepository.save(reservation);
         });
