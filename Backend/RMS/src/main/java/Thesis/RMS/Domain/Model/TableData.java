@@ -67,5 +67,4 @@ public class TableData {
         @Column(nullable = false)
         private int floor; // Floor number
 
-
 }

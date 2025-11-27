@@ -42,4 +42,5 @@ public class Order {
             inverseJoinColumns = @JoinColumn(name = "item_id")
     )
     private List<Item> items = new ArrayList<>();
+
 }

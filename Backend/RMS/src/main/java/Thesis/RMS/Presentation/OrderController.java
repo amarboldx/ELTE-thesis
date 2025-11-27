@@ -123,4 +123,15 @@ public class OrderController {
         orderUseCases.cancelOrder(id);
         return ResponseEntity.ok().build();
     }
+
+    @Transactional
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_WAITER')")
+    @PostMapping("/{id}/pay")
+    public ResponseEntity<Void> payOrder(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0.0") double tipAmount
+    ) {
+        orderUseCases.payOrder(id, tipAmount);
+        return ResponseEntity.ok().build();
+    }
 }

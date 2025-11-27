@@ -53,4 +53,5 @@ public interface JpaOrderRepository extends JpaRepository<Order, Long>, OrderRep
     @Query("SELECT o FROM Order o WHERE o.tableData.id = :tableDataId")
     List<Order> findByTableDataId(@NonNull Long tableDataId);
 
+
 }

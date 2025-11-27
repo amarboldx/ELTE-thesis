@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -25,6 +26,7 @@ public class OrderUseCases {
     private final TableRepository tableDataRepository;
     private final StaffRepository staffRepository;
     private final UserRepository userRepository;
+    private final ReceiptRepository receiptRepository;
 
 
     private OrderDTO convertToDTO(Order order) {
@@ -163,7 +165,7 @@ public class OrderUseCases {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
 
-        if (order.getStatus() == OrderStatus.COMPLETED) {
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.PAID) {
             throw new IllegalStateException("Cannot add items to a completed order.");
         }
 
@@ -178,6 +180,8 @@ public class OrderUseCases {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
 
+
+
         order.setStatus(status);
         orderRepository.save(order);
 
@@ -190,7 +194,7 @@ public class OrderUseCases {
             List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
 
             boolean allComplete = tableOrders.stream()
-                    .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
+                    .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED || o.getStatus() == OrderStatus.PAID);
 
             if (allComplete) {
                 table.setTableStatus(TableStatus.AVAILABLE);
@@ -216,7 +220,7 @@ public class OrderUseCases {
                 .filter(item -> item.getId().equals(itemId))
                 .findFirst();
 
-        if (!itemToRemove.isPresent()) {
+        if (itemToRemove.isEmpty()) {
             throw new IllegalArgumentException("Item not found in order");
         }
 
@@ -240,6 +244,65 @@ public class OrderUseCases {
                 .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED || o.getStatus() == OrderStatus.CANCELLED);
 
         if (allComplete) {
+            table.setTableStatus(TableStatus.AVAILABLE);
+            tableDataRepository.save(table);
+        }
+    }
+
+
+    @Transactional
+    public void payOrder(Long orderId, double tipAmount) {
+        if (tipAmount < 0) {
+            throw new IllegalArgumentException("Tip amount cannot be negative.");
+        }
+
+        // 1. Load order
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Order with ID " + orderId + " not found."));
+
+        // 2. Guard against invalid states
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot pay for a cancelled order.");
+        }
+        if (order.getStatus() == OrderStatus.PAID) {
+            throw new IllegalStateException("Order is already paid.");
+        }
+
+        // 3. Calculate total from item prices
+        double totalAmount = order.getItems().stream()
+                .mapToDouble(Item::getPrice)
+                .sum();
+
+        if (totalAmount <= 0) {
+            throw new IllegalStateException("Cannot pay for an order with zero total amount.");
+        }
+
+        // 4. Create and save receipt
+        Receipt receipt = new Receipt();
+        receipt.setOrder(order);
+        receipt.setIssuedAt(LocalDateTime.now());
+        receipt.setTotalAmount(totalAmount);
+        receipt.setTipAmount(tipAmount);
+        receipt.setFinalAmount(totalAmount + tipAmount);
+
+        receiptRepository.save(receipt);
+
+        // 5. Mark order as PAID
+        order.setStatus(OrderStatus.PAID);
+        orderRepository.save(order);
+
+        // 6. Update table status (same logic as in updateOrderStatus)
+        TableData table = order.getTableData();
+        List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
+
+        boolean allDone = tableOrders.stream()
+                .allMatch(o ->
+                        o.getStatus() == OrderStatus.COMPLETED
+                                || o.getStatus() == OrderStatus.CANCELLED
+                                || o.getStatus() == OrderStatus.PAID);
+
+        if (allDone) {
             table.setTableStatus(TableStatus.AVAILABLE);
             tableDataRepository.save(table);
         }
