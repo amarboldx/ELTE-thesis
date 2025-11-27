@@ -19,6 +19,7 @@ api.interceptors.request.use(
 
     if (token && !isAuthRoute) {
       config.headers['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
     }
 
     return config;

@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import {Card, Title, Paragraph, Snackbar} from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -42,6 +43,12 @@ const OrderScreen = () => {
   const [staffNames, setStaffNames] = useState({});
   const [tableIds, setTableIds] = useState({});
   const [role, setRole] = useState('');
+
+  const [payTargetOrder, setPayTargetOrder] = useState(null);
+  const [isPayDetailsVisible, setIsPayDetailsVisible] = useState(false);
+  const [tipMode, setTipMode] = useState('amount');
+  const [tipInput, setTipInput] = useState('0');
+
 
   const navigation = useNavigation();
 
@@ -221,6 +228,35 @@ const OrderScreen = () => {
         return currentStatus;
     }
   };
+  const calculateTotals = (order, tipMode, tipInput) => {
+    if (!order) return {subtotal: 0, tip: 0, total: 0};
+
+    const priceMap = allItems.reduce((acc, item) => {
+      acc[item.id] = item.price || 0;
+      return acc;
+    }, {});
+
+    const subtotal = (order.itemIds || []).reduce(
+      (sum, id) => sum + (priceMap[id] || 0),
+      0,
+    );
+
+    const tipRaw = parseFloat(tipInput || '0');
+    let tip = 0;
+
+    if (!isNaN(tipRaw) && tipRaw > 0) {
+      if (tipMode === 'amount') {
+        tip = tipRaw;
+      } else {
+        tip = +(subtotal * (tipRaw / 100)).toFixed(2);
+      }
+    }
+
+    const total = +(subtotal + tip).toFixed(2);
+    return {subtotal, tip, total};
+  };
+
+
 
   const getStatusColor = status => {
     switch (status) {
@@ -288,6 +324,61 @@ const OrderScreen = () => {
       showSnackbar('Failed to delete order');
     }
   };
+
+    const openPayDetails = order => {
+    setPayTargetOrder(order);
+    setTipMode('amount');
+    setTipInput('0');
+    setIsPayDetailsVisible(true);
+  };
+
+  const confirmPayOrder = order => {
+    Alert.alert(
+      'Confirm Payment',
+      'Do you want to mark this order as PAID and create a receipt?',
+      [
+        {text: 'No', style: 'cancel'},
+        {text: 'Yes', onPress: () => openPayDetails(order)},
+      ],
+    );
+  };
+
+  const handleConfirmPay = async () => {
+    if (!payTargetOrder) return;
+
+    const {subtotal, tip, total} = calculateTotals(
+      payTargetOrder,
+      tipMode,
+      tipInput,
+    );
+
+    try {
+
+        await api.post(
+          `/order/${payTargetOrder.id}/pay`,
+          null,
+          { params: { tipAmount: tip } }
+        );
+
+      setAllOrders(prev =>
+        prev.map(o =>
+          o.id === payTargetOrder.id ? {...o, status: 'PAID'} : o,
+        ),
+      );
+
+      showSnackbar(
+        `Order #${payTargetOrder.id} marked as PAID (Total: ${total.toFixed(
+          2,
+        )})`,
+      );
+      setIsPayDetailsVisible(false);
+      setPayTargetOrder(null);
+    } catch (err) {
+      console.error('Error paying order:', err);
+      showSnackbar('Failed to complete payment');
+    }
+  };
+
 
   const showSnackbar = message => {
     setSnackbarMessage(message);
@@ -368,6 +459,105 @@ const OrderScreen = () => {
       showSnackbar(err.response?.data?.message || 'Failed to remove item');
     }
   };
+
+    const renderPayDetailsModal = () => {
+    if (!payTargetOrder) return null;
+
+    const {subtotal, tip, total} = calculateTotals(
+      payTargetOrder,
+      tipMode,
+      tipInput,
+    );
+
+    const isAmountMode = tipMode === 'amount';
+
+    return (
+      <Modal
+        transparent
+        visible={isPayDetailsVisible}
+        animationType="fade"
+        onRequestClose={() => setIsPayDetailsVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.payModalBox}>
+            <Text style={styles.modalTitle}>
+              Payment for Order #{payTargetOrder.id}
+            </Text>
+
+            <View style={styles.tipToggleRow}>
+              <Pressable
+                style={[
+                  styles.tipToggleButton,
+                  isAmountMode && styles.tipToggleButtonActive,
+                ]}
+                onPress={() => setTipMode('amount')}>
+                <Text
+                  style={[
+                    styles.tipToggleText,
+                    isAmountMode && styles.tipToggleTextActive,
+                  ]}>
+                  Fixed Tip
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tipToggleButton,
+                  !isAmountMode && styles.tipToggleButtonActive,
+                ]}
+                onPress={() => setTipMode('percentage')}>
+                <Text
+                  style={[
+                    styles.tipToggleText,
+                    !isAmountMode && styles.tipToggleTextActive,
+                  ]}>
+                  % Tip
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.tipInputRow}>
+              {isAmountMode && <Text style={styles.tipPrefix}>$</Text>}
+              <TextInput
+                style={styles.tipInput}
+                keyboardType="numeric"
+                value={tipInput}
+                onChangeText={setTipInput}
+                placeholder={isAmountMode ? 'Tip amount' : 'Tip %'}
+              />
+              {!isAmountMode && <Text style={styles.tipSuffix}>%</Text>}
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text>Subtotal:</Text>
+              <Text>{subtotal.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text>Tip:</Text>
+              <Text>{tip.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={{fontWeight: 'bold'}}>Total:</Text>
+              <Text style={{fontWeight: 'bold'}}>{total.toFixed(2)}</Text>
+            </View>
+
+            <Pressable
+              style={[styles.modalOption, {marginTop: 16}]}
+              onPress={handleConfirmPay}>
+              <Text style={styles.modalOptionText}>Pay</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.modalOption, {backgroundColor: '#ccc'}]}
+              onPress={() => setIsPayDetailsVisible(false)}>
+              <Text style={[styles.modalOptionText, {color: '#333'}]}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
 
   const renderEditModal = () => {
     const groupedItems = groupItems(selectedOrder?.itemIds);
@@ -455,7 +645,15 @@ const OrderScreen = () => {
   };
 
   const renderRightActions = item => {
-    if (item.status === 'COMPLETED') return null;
+    if (item.status === 'COMPLETED') {
+      return (
+        <RectButton
+          style={[styles.actionContainer, {backgroundColor: '#4CAF50'}]}
+          onPress={() => confirmPayOrder(item)}>
+          <Text style={styles.actionText}>PAID</Text>
+        </RectButton>
+      );
+    }
 
     const nextStatus = getNextStatus(item.status);
     const bgColor = nextStatus === 'PENDING' ? '#FF9800' : '#4CAF50';
@@ -468,6 +666,7 @@ const OrderScreen = () => {
       </RectButton>
     );
   };
+
 
   const renderLeftActions = item => {
     if (item.status === 'COMPLETED') return null;
@@ -524,11 +723,14 @@ const OrderScreen = () => {
         renderRightActions={() => renderRightActions(item)}
         renderLeftActions={() => renderLeftActions(item)}
         onSwipeableRightOpen={() => {
-          if (item.status !== 'COMPLETED') {
+          if (item.status === 'COMPLETED') {
+            confirmPayOrder(item);
+          } else {
             const nextStatus = getNextStatus(item.status);
             handleStatusChange(item, nextStatus);
           }
         }}
+
         onSwipeableLeftOpen={() => {
           if (item.status !== 'COMPLETED') {
             Alert.alert(
@@ -668,6 +870,28 @@ const OrderScreen = () => {
           }
         />
       )}
+            {(role === 'ADMIN' || role === 'WAITER') && (
+        <TouchableOpacity
+          style={styles.receiptFab}
+          onPress={() => navigation.navigate('Receipt')}>
+          <MaterialCommunityIcons name="receipt" size={22} color="white" />
+        </TouchableOpacity>
+      )}
+
+      {(role === 'ADMIN' || role === 'WAITER') && (
+        <TouchableOpacity style={styles.fab} onPress={handleAddOrder}>
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <MaterialCommunityIcons name="plus" size={24} color="white" />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {(role === 'ADMIN' || role === 'WAITER') && (
         <TouchableOpacity style={styles.fab} onPress={handleAddOrder}>
           <View
@@ -747,6 +971,7 @@ const OrderScreen = () => {
       </Modal>
 
       {renderEditModal()}
+      {renderPayDetailsModal()}
 
       <Snackbar
         visible={snackbarVisible}
@@ -868,6 +1093,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
   },
+    receiptFab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 90,
+    backgroundColor: '#009688',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -977,6 +1214,65 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+    payModalBox: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+  },
+  tipToggleRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  tipToggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  tipToggleButtonActive: {
+    backgroundColor: '#6200ee',
+    borderColor: '#6200ee',
+  },
+  tipToggleText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  tipToggleTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  tipInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tipPrefix: {
+    marginRight: 4,
+    fontSize: 16,
+  },
+  tipSuffix: {
+    marginLeft: 4,
+    fontSize: 16,
+  },
+  tipInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+    fontSize: 14,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+
 });
 
 export default OrderScreen;
