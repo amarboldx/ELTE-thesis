@@ -46,7 +46,7 @@ const AddMenuScreen = ({ navigation }) => {
     };
 
     try {
-      const response = await api.post('/menu/add', createItemRequest);
+      const response = await api.post('/menu', createItemRequest);
       console.log('Item added:', response.data);
       Alert.alert('Success', 'Item added successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }

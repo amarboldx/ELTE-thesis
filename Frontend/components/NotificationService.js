@@ -341,6 +341,26 @@ class NotificationService {
   notifyReservationListeners = event => {
     this.reservationListeners.forEach(listener => listener(event));
   };
+
+    stopAll = () => {
+    if (this.sseEmitter) {
+      this.sseEmitter.close();
+      this.sseEmitter = null;
+    }
+    if (this.reservationEmitter) {
+      this.reservationEmitter.close();
+      this.reservationEmitter = null;
+    }
+    this.currentScreen = null;
+    this.unreadCount = 0;
+    this.reservationUnreadCount = 0;
+
+    this.listeners = [];
+    this.reservationListeners = [];
+    this.countListeners = [];
+    this.reservationCountListeners = [];
+    this.notificationListeners = [];
+  };
 }
 
 export default new NotificationService();
