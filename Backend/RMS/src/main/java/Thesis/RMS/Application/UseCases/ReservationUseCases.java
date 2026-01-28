@@ -11,6 +11,7 @@ import Thesis.RMS.Domain.Repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -88,9 +89,18 @@ public class ReservationUseCases {
                 .map(this::toReservationResponseDTO)
                 .collect(Collectors.toList());
     }
-
+    @Transactional
     public void deleteReservationById(Long id) {
-        reservationRepository.deleteById(id);
+
+        reservationRepository.findById(id).ifPresent(reservation -> {
+            TableData table = reservation.getTableData();
+            if (table != null) {
+                table.setTableStatus(TableStatus.AVAILABLE);
+                tableDataRepository.save(table);
+            }
+            reservationRepository.deleteById(id);
+        });
+
     }
 
     public void updateReservationStatus(Long id, ReservationStatus status) {

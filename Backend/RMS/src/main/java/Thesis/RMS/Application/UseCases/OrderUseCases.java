@@ -119,8 +119,32 @@ public class OrderUseCases {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public void deleteOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order with ID " + orderId + " not found."));
+
+        TableData table = order.getTableData();
+
+        // 1. Perform the deletion first
         orderRepository.deleteById(orderId);
+
+        // 2. Check remaining orders for the same table
+        if (table != null) {
+            List<Order> remainingOrders = orderRepository.findByTableDataId(table.getId());
+
+            // Check if all other orders are in a terminal state
+            boolean allFinished = remainingOrders.stream()
+                    .allMatch(o -> o.getStatus() == OrderStatus.COMPLETED
+                            || o.getStatus() == OrderStatus.CANCELLED
+                            || o.getStatus() == OrderStatus.PAID);
+
+            // If no orders left or all finished, set table to AVAILABLE
+            if (remainingOrders.isEmpty() || allFinished) {
+                table.setTableStatus(TableStatus.AVAILABLE);
+                tableDataRepository.save(table);
+            }
+        }
     }
 
     @Transactional
@@ -292,7 +316,7 @@ public class OrderUseCases {
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
-        // 6. Update table status (same logic as in updateOrderStatus)
+        // 6. Update table status and clear assigned staff
         TableData table = order.getTableData();
         List<Order> tableOrders = orderRepository.findByTableDataId(table.getId());
 
@@ -304,6 +328,7 @@ public class OrderUseCases {
 
         if (allDone) {
             table.setTableStatus(TableStatus.AVAILABLE);
+            table.setAssignedStaff(null); // Clear the waiter assignment
             tableDataRepository.save(table);
         }
     }

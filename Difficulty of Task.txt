@@ -1,0 +1,36 @@
+My difficulty of task points are justified as:
+ 
+I covered 3 final exam topics:
+
+a) Object-Oriented Modeling- I applied key OOP principles in the backend, such as:
+Abstraction (via service interfaces) - to make my code modular and maintainable
+Inheritance - to extend the JPA Repository to interact with the database
+Dependency Injection (using Spring Boot for loose coupling)
+Enums were also used to represent fixed role and status values. These practices reflect solid application of Object-Oriented Modeling in a real-world context.
+
+b) Object-Oriented Design: Applied through modular and maintainable code structure.
+I used clean architecture to well structure my code and implemented patterns including 
+Repository (database abstraction) to abstract my database implementation via JPA, 
+Data Transfer Object (DTO) to simplify data transfers, 
+Dependency Injection (DI) to promotes loose coupling by injecting dependencies rather than manually creating them, 
+Observer Pattern to notify connected clients about order updates.
+
+c)Object Oriented Programming Languages-
+Because I used Java/Spring Boot for my backend, and I used it to create objects and enums to structure my code better. This helped organize my codebase. I used Abstraction to make my database connection modular
+
+Complex Feature #1: Server Sent Events
+I created a SSE stream that notifies connected users when new order is created, order is modified, or the order is removed. 
+The client creates a constant HTTP connection with the server and when certain API endpoints are hit, the server notifies all users
+The client will show a popup notification related to the sent event, and refresh the Order page if the user is currently on it
+
+Complex Feature #2: User Authentication and Authorization 
+Users registering will have their passwords hashed using BCrypt, and when they login, the hashes are compared and a JWT token is issued.
+Client uses the JWT for each HTTP Request they make with the server.
+The server uses Spring Security to authenticate users, and uses Role Based Authorization to permit users.
+
+
+Complex Feature #3: Responsive UI
+I have developed a responsive UI that updates optimistically for a smoother user experience. The UI will update before making sure given request is accepted by the server, if not the UI will rollback to its initial state.
+I have developed a Shift management calendar with functionality found Google Calendar and IOS Calendar. Swipe gestures can be used to go the next or previous days or weeks.
+I have developed a top down table management system allowing for easier experience for the staff. Tables can be created and can exist on multiple floors. Tables can be moved using the UI, and the status of each table is updated based on if the table is reserved, if it has people already dining in it or not.
+
